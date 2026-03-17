@@ -1,0 +1,24 @@
+.DS_Store
+
+# env / secrets
+.env
+.env.*
+
+# node / next
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# large 3d assets (use Git LFS if you want these in repo)
+frontend/public/avatars/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# misc
+*.pem
+*.tsbuildinfo

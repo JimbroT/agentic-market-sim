@@ -5,18 +5,24 @@ import { motion, type Transition } from "framer-motion";
 import { cn } from "../lib/arena-math";
 import { getArenaLayoutAtProgress } from "../lib/arena-layout";
 import { AgentThoughtsCard } from "./agent-thoughts-card";
-import type { PortfolioEntity, AgentInsight } from "../types";
+import type { PortfolioEntity } from "../types";
+import { toEntityId } from "../hooks/use-simulation-data";
+import type {
+  Participant,
+  WorldState,
+} from "../hooks/use-simulation-data";
 
 type PodiumStageProps = {
   entities: PortfolioEntity[];
-  playbackProgress: number;
+  playbackProgress: number; // continuous 0..maxProgress
   bottomOffset: number;
   isPlaying: boolean;
   onSelectEntity?: (id: string) => void;
   onClearSelection?: () => void;
   selectedEntityId?: string;
-  displayedRound?: number;
-  agentInsights?: AgentInsight[];
+  displayedRound?: number; // should be same as playbackProgress
+  participants?: Participant[];
+  world: WorldState | null;
 };
 
 type CardPosition = {
@@ -32,6 +38,12 @@ type CardSize = {
 type ContainerSize = {
   width: number;
   height: number;
+};
+
+type LiveMetrics = {
+  portfolioBefore: number;
+  portfolioAfter: number;
+  pnlDelta: number;
 };
 
 const spring: Transition = {
@@ -110,7 +122,8 @@ export function PodiumStage({
   onClearSelection,
   selectedEntityId,
   displayedRound,
-  agentInsights,
+  participants,
+  world,
 }: PodiumStageProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerSize, setContainerSize] = useState<ContainerSize>({
@@ -146,17 +159,87 @@ export function PodiumStage({
     bottomOffset
   );
 
-  const currentRound = Math.max(1, Math.round(displayedRound ?? 1));
+  // integer round label for the card (0-based)
+  const currentRound = Math.max(
+    0,
+    Math.floor(displayedRound ?? playbackProgress ?? 0)
+  );
 
-  const selectedLayout = layout.find((entity) => entity.id === selectedEntityId);
+  const selectedLayout = layout.find((e) => e.id === selectedEntityId);
 
-  const selectedInsight =
-    selectedEntityId && currentRound
-      ? agentInsights?.find(
-          (row) =>
-            row.participant_id === selectedEntityId && row.round === currentRound
-        )
-      : undefined;
+  const selectedParticipant = participants?.find((p) => {
+    if (!selectedEntityId) return false;
+    const id = toEntityId(p.name);
+    return id === selectedEntityId;
+  });
+
+  const selectedMemoryEntry =
+    currentRound === 0
+      ? undefined
+      : selectedParticipant?.memory.find((m) => m.round === currentRound) ??
+        selectedParticipant?.memory.find((m) => typeof m.round === "number");
+
+  // Live interpolated metrics so the card updates continuously
+  let liveMetrics: LiveMetrics | undefined = undefined;
+
+  // inside PodiumStage, replacing your liveMetrics block
+  if (selectedParticipant) {
+    const rounds = selectedParticipant.memory
+      .filter((m) => typeof m.round === "number")
+      .sort((a, b) => (a.round! - b.round!)); // [1,2,3]
+
+    if (rounds.length > 0) {
+      // playbackProgress is 1..3
+      const t = playbackProgress;
+
+      // find the segment that contains t
+      let lower = rounds[0];
+      let upper = rounds[rounds.length - 1];
+
+      for (let i = 0; i < rounds.length - 1; i++) {
+        const a = rounds[i];
+        const b = rounds[i + 1];
+        if ((a.round ?? 0) <= t && t <= (b.round ?? 0)) {
+          lower = a;
+          upper = b;
+          break;
+        }
+      }
+
+      // if t is before first or after last, clamp
+      if (t <= (rounds[0].round ?? 1)) {
+        lower = rounds[0];
+        upper = rounds[0];
+      } else if (t >= (rounds[rounds.length - 1].round ?? t)) {
+        lower = rounds[rounds.length - 1];
+        upper = rounds[rounds.length - 1];
+      }
+
+      const t0 = lower.round ?? 1;
+      const t1 = upper.round ?? t0;
+      const alpha = t1 === t0 ? 0 : (t - t0) / (t1 - t0);
+
+      const lerp = (a: number, b: number, aT: number) => a + (b - a) * aT;
+
+      const after0 = lower.portfolio_total_after ?? 100;
+      const after1 = upper.portfolio_total_after ?? after0;
+      const pnl0 = lower.pnl_delta ?? 0;
+      const pnl1 = upper.pnl_delta ?? pnl0;
+
+      const portfolioAfterRaw = lerp(after0, after1, alpha);
+      const pnlDeltaRaw = lerp(pnl0, pnl1, alpha);
+      const portfolioBeforeRaw = portfolioAfterRaw - pnlDeltaRaw;
+
+      const INDEX_NOTIONAL = 1000;
+
+      liveMetrics = {
+        portfolioAfter: portfolioAfterRaw * INDEX_NOTIONAL,
+        portfolioBefore: portfolioBeforeRaw * INDEX_NOTIONAL,
+        pnlDelta: pnlDeltaRaw * INDEX_NOTIONAL,
+      };
+    }
+  }
+
 
   const anchoredCardPosition = useMemo<CardPosition | null>(() => {
     if (!selectedLayout) return null;
@@ -164,7 +247,9 @@ export function PodiumStage({
 
     const anchorX = (selectedLayout.xPercent / 100) * containerSize.width;
     const anchorBottom =
-      selectedLayout.bottomPx + selectedLayout.podiumHeight + CARD_GAP_ABOVE_PODIUM;
+      selectedLayout.bottomPx +
+      selectedLayout.podiumHeight +
+      CARD_GAP_ABOVE_PODIUM;
 
     const desired = {
       x: anchorX - cardSize.width / 2,
@@ -251,7 +336,9 @@ export function PodiumStage({
 
                 <motion.button
                   type="button"
-                  onClick={() => onSelectEntity?.(entity.id)}
+                  onClick={() => {
+                    onSelectEntity?.(entity.id);
+                  }}
                   className={cn(
                     "mt-3 w-full rounded-2xl border border-white/10 bg-[#0f172acc] px-3 py-2.5 text-left text-xs shadow-[0_12px_32px_rgba(0,0,0,0.38)] backdrop-blur-md transition outline-none",
                     "hover:bg-[#13203aee] hover:border-white/15",
@@ -282,7 +369,9 @@ export function PodiumStage({
                       "mt-1 text-[11px] font-medium",
                       pnl.positive && "text-[#4ade80]",
                       pnl.negative && "text-[#f87171]",
-                      !pnl.positive && !pnl.negative && "text-[#94a3b8]"
+                      !pnl.positive &&
+                        !pnl.negative &&
+                        "text-[#94a3b8]"
                     )}
                   >
                     {pnl.label}
@@ -320,11 +409,14 @@ export function PodiumStage({
         );
       })}
 
-      {selectedLayout && activeCardPosition ? (
+      {selectedLayout && activeCardPosition && selectedParticipant ? (
         <AgentThoughtsCard
-          insight={selectedInsight}
+          participant={selectedParticipant}
+          memoryEntry={selectedMemoryEntry}
+          world={world ?? undefined}
           label={selectedLayout.label}
           round={currentRound}
+          liveMetrics={liveMetrics}
           onClose={onClearSelection}
           position={activeCardPosition}
           dragConstraintsRef={containerRef}

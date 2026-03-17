@@ -1,14 +1,5 @@
 "use client";
 
-/**
- * Playback controller for the explore arena.
- *
- * Exposes a continuous `playbackProgress` (fractional rounds allowed) and
- * convenience handlers for play/pause, scrubbing, and round stepping.
- *
- * Design note:
- * - Uses `requestAnimationFrame` so playback stays in sync with render frames.
- */
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PortfolioEntity } from "../types";
 
@@ -16,21 +7,16 @@ type UsePlaybackArgs = {
   entities: PortfolioEntity[];
 };
 
-/**
- * Time in ms for one full round-to-round transition.
- * This should feel smooth, readable, and not sluggish.
- */
 const ROUND_TRAVEL_MS = 3000;
 
-/**
- * Animation frame stepper for continuous playback progress.
- */
 export function usePlayback({ entities }: UsePlaybackArgs) {
+  // entities[0].roundValues = [start, round1, round2, round3]
   const totalRounds = useMemo(
     () => entities[0]?.roundValues.length ?? 0,
     [entities]
   );
 
+  // internal domain 0..(totalRounds - 1) → 0..3
   const maxProgress = Math.max(totalRounds - 1, 0);
 
   const [playbackProgress, setPlaybackProgress] = useState(0);
@@ -81,12 +67,16 @@ export function usePlayback({ entities }: UsePlaybackArgs) {
 
   function handleNextRound() {
     setIsPlaying(false);
-    setPlaybackProgress((previous) => Math.min(Math.ceil(previous + 0.001), maxProgress));
+    setPlaybackProgress((previous) =>
+      Math.min(Math.floor(previous + 1), maxProgress)
+    );
   }
 
   function handlePreviousRound() {
     setIsPlaying(false);
-    setPlaybackProgress((previous) => Math.max(Math.floor(previous - 0.001), 0));
+    setPlaybackProgress((previous) =>
+      Math.max(Math.ceil(previous - 1), 0)
+    );
   }
 
   function handleReset() {
@@ -108,16 +98,25 @@ export function usePlayback({ entities }: UsePlaybackArgs) {
 
   function handleScrub(nextProgress: number) {
     setIsPlaying(false);
-    setPlaybackProgress(Math.min(Math.max(nextProgress, 0), maxProgress));
+    setPlaybackProgress(
+      Math.min(Math.max(nextProgress, 0), maxProgress)
+    );
   }
 
-  const currentRound = Math.floor(playbackProgress);
-  const displayedRound = playbackProgress + 1;
+  const continuousRound = playbackProgress;      // 0..3
+  const currentRound = Math.floor(continuousRound);
+  const displayedRound = continuousRound;
+
+  // UI: 1..4 label space (so you can show "Round 1.00 of 4")
+  const uiRound = displayedRound + 1;            // 1..4
+  const uiRoundTotal = maxProgress + 1;          // 4
 
   return {
     playbackProgress,
     currentRound,
     displayedRound,
+    uiRound,
+    uiRoundTotal,
     totalRounds,
     maxProgress,
     isPlaying,

@@ -15,7 +15,7 @@ import { ArenaLegend } from "./components/arena-legend";
 import { useSimulationData } from "./hooks/use-simulation-data";
 
 export function ExploreCanvas() {
-  const { entities, insights: agentInsights, loading, error } =
+  const { entities, participants, world, loading, error } =
     useSimulationData();
 
   const [selectedEntityId, setSelectedEntityId] = useState<string>();
@@ -64,7 +64,6 @@ export function ExploreCanvas() {
   if (!isReady) {
     return (
       <main className="flex min-h-screen flex-col bg-[#020617] text-[#e2e8f0]">
-        {/* Permanent header */}
         <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600" />
@@ -108,7 +107,6 @@ export function ExploreCanvas() {
       ref={containerRef}
       className="relative flex min-h-screen flex-col bg-[#020617] text-[#e2e8f0]"
     >
-      {/* Permanent header */}
       <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600" />
@@ -150,7 +148,8 @@ export function ExploreCanvas() {
             onClearSelection={() => setSelectedEntityId(undefined)}
             selectedEntityId={selectedEntityId}
             displayedRound={displayedRound}
-            agentInsights={agentInsights}
+            participants={participants ?? []}
+            world={world}
           />
 
           <ArenaLegend />
@@ -173,7 +172,6 @@ export function ExploreCanvas() {
             onPause={handlePause}
           />
 
-          {/* Timeline dock floats over the bottom, no extra layout height */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40">
             <div className="pointer-events-auto border-t border-white/10 bg-[#020617f2] backdrop-blur-xl">
               <TimelineDock

@@ -31,48 +31,85 @@ export type ResizeState = {
   startHeight: number;
 } | null;
 
-export type MarketMetrics = {
-  rates: number;
-  inflation: number;
-  growth: number;
-  volatility: number;
-  sentiment: number;
+export type AllocationBreakdown = {
+  cash?: number;
+  bonds?: number;
+  equities?: number;
+  commodities?: number;
+  volatility?: number;
 };
 
-export type AllocationBreakdown = {
-  cash: number;
-  bonds: number;
-  equities: number;
-  commodities: number;
-  volatility: number;
+export type MarketMetrics = {
+  rates?: number;
+  inflation?: number;
+  growth?: number;
+  volatility?: number;
+  sentiment?: number;
 };
 
 export type AgentProfile = {
-  participantId: string;
-  name: string;
-  description: string;
-  conviction: number;
-  riskBudget: number;
+  participantId?: string;
+  participant_id?: string;
+
+  name?: string;
+
+  conviction?: number;
+
+  riskBudget?: number;
+  risk_budget?: number;
+
+  portfolio?: AllocationBreakdown;
+
   latestAction?: string;
-  portfolio: AllocationBreakdown;
+  latest_action?: string;
+
+  styleSummary?: string;
+  style_summary?: string;
 };
 
 export type AgentInsight = {
-  participant_id: string;
-  round: number;
-  thought?: string;
+  participantId?: string;
+  participant_id?: string;
+
+  round?: number;
+
+  shockSummary?: string;
   shock_summary?: string;
+
+  thought?: string;
+  thesis?: string;
+
   action?: string;
   rationale?: string;
-  portfolio_total_before?: number;
-  portfolio_total_after?: number;
-  pnl_delta?: number;
-  market_metrics?: MarketMetrics;
-  allocation_after?: AllocationBreakdown;
-  profile?: AgentProfile;
+
+  keySignals?: string[];
   key_signals?: string[];
+
   risks?: string[];
+
+  rejectedAlternatives?: string[];
   rejected_alternatives?: string[];
+
+  expectedNextMove?: string;
   expected_next_move?: string;
+
   confidence?: number;
+
+  marketMetrics?: MarketMetrics;
+  market_metrics?: MarketMetrics;
+
+  allocationAfter?: AllocationBreakdown;
+  allocation_after?: AllocationBreakdown;
+
+  portfolioTotalBefore?: number;
+  portfolio_total_before?: number;
+
+  portfolioTotalAfter?: number;
+  portfolio_total_after?: number;
+
+  pnlDelta?: number;
+  pnl_delta?: number;
+
+  profile?: AgentProfile;
 };
+

@@ -1,23 +1,60 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { AgentInsight, PortfolioEntity } from "../types";
+import type { PortfolioEntity } from "../types";
 
-type RawRoundSeries = {
-  participant_id: string;
-  backend_name: string;
-  round_values: number[];
+type ParticipantMemoryEntry = {
+  type?: string;
+  round?: number;
+  shock_summary?: string;
+  action?: string;
+  rationale?: string;
+  portfolio_total_after?: number;
+  pnl_delta?: number;
+};
+
+export type Participant = {
+  name: string;
+  portfolio: {
+    cash: number;
+    bonds: number;
+    equities: number;
+    commodities: number;
+    volatility: number;
+  };
+  conviction: number;
+  risk_budget: number;
+  memory: ParticipantMemoryEntry[];
+  latest_action: string;
+};
+
+export type WorldState = {
+  event: string;
+  regime: string;
+  horizon: string;
+  timeline_mode: string;
+  current_round: number;
+  world_variables: {
+    rates: number;
+    inflation: number;
+    growth: number;
+    volatility: number;
+    sentiment: number;
+  };
+  participants: Participant[];
 };
 
 type SimulationResponse = {
   status: string;
-  agent_insights?: AgentInsight[];
-  round_series?: RawRoundSeries[];
+  result: {
+    world_state: WorldState;
+  };
 };
 
 type UseSimulationDataResult = {
   entities: PortfolioEntity[] | null;
-  insights: AgentInsight[];
+  participants: Participant[];
+  world: WorldState | null;
   loading: boolean;
   error: string | null;
 };
@@ -82,18 +119,23 @@ const ENTITY_VISUALS: Record<
 };
 
 const BACKEND_NAME_TO_ENTITY_ID: Record<string, string> = {
-  macrohedgefund: "macro-hf",
-  longonlyfund: "long-only",
-  volatilityfund: "vol-fund",
-  commoditiesfund: "alpha-cap",
-  ratestraders: "delta-sys",
-  marketmakers: "quant-lab",
-  retailtraders: "signal-x",
-  centralbankwatchers: "deep-value",
+  macro_hedge_fund: "macro-hf",
+  long_only_fund: "long-only",
+  volatility_fund: "vol-fund",
+  commodities_fund: "alpha-cap",
+  rates_traders: "delta-sys",
+  market_makers: "quant-lab",
+  retail_traders: "signal-x",
+  central_bank_watchers: "deep-value",
 };
 
 function normalizeKey(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return value.toLowerCase().replace(/[^a-z0-9_]/g, "");
+}
+
+export function toEntityId(raw?: string) {
+  const normalized = normalizeKey(raw ?? "");
+  return BACKEND_NAME_TO_ENTITY_ID[normalized] ?? normalized;
 }
 
 export function useSimulationData(): UseSimulationDataResult {
@@ -124,37 +166,60 @@ export function useSimulationData(): UseSimulationDataResult {
         }
 
         const data = (await response.json()) as SimulationResponse;
-        if (!cancelled) setRawData(data);
+        if (!cancelled) {
+          setRawData(data);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Unknown error");
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
     load();
+
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const world = useMemo<WorldState | null>(() => {
+    return rawData?.result?.world_state ?? null;
+  }, [rawData]);
+
+  const participants = useMemo<Participant[]>(() => {
+    return world?.participants ?? [];
+  }, [world]);
+
   const entities = useMemo<PortfolioEntity[] | null>(() => {
-    if (!rawData?.round_series) return null;
+    if (!world) return null;
 
-    return rawData.round_series.map((series) => {
-      const id =
-        BACKEND_NAME_TO_ENTITY_ID[normalizeKey(series.backend_name)] ??
-        normalizeKey(series.participant_id);
-
+    return world.participants.map((p) => {
+      const id = toEntityId(p.name);
       const visuals = ENTITY_VISUALS[id];
       const startingBalance = 100;
-      const roundValues = [startingBalance, ...(series.round_values ?? [])];
+
+      const memoryRounds = p.memory.filter(
+        (m) => typeof m.round === "number"
+      );
+      const sortedRounds = memoryRounds.sort(
+        (a, b) => (a.round ?? 0) - (b.round ?? 0)
+      );
+
+      const roundValues = [
+        startingBalance,
+        ...sortedRounds.map(
+          (m) => m.portfolio_total_after ?? startingBalance
+        ),
+      ];
 
       return {
         id,
-        label: visuals?.label ?? series.backend_name,
+        label: visuals?.label ?? p.name,
         color: visuals?.color ?? "#2563eb",
         accent: visuals?.accent ?? "#60a5fa",
         avatarUrl: visuals?.avatarUrl,
@@ -162,11 +227,7 @@ export function useSimulationData(): UseSimulationDataResult {
         roundValues,
       };
     });
-  }, [rawData]);
+  }, [world]);
 
-  const insights = useMemo<AgentInsight[]>(() => {
-    return rawData?.agent_insights ?? [];
-  }, [rawData]);
-
-  return { entities, insights, loading, error };
+  return { entities, participants, world, loading, error };
 }

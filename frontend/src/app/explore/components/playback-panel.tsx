@@ -140,7 +140,7 @@ export function PlaybackPanel({
             </div>
 
             <ProgressBar
-              currentRound={displayedRound - 1}
+              currentRound={displayedRound}
               totalRounds={totalRounds}
             />
           </div>

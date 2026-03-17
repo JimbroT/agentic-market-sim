@@ -1,11 +1,14 @@
+/**
+ * Compact progress bar used inside the playback panel.
+ *
+ * Interprets `currentRound` as a continuous position and normalizes it against
+ * the total number of rounds for display.
+ */
 type ProgressBarProps = {
     currentRound: number;
     totalRounds: number;
   };
-  
-  /**
-   * Compact progress bar used inside the playback panel.
-   */
+
   export function ProgressBar({
     currentRound,
     totalRounds,

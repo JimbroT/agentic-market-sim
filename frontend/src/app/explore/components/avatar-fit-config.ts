@@ -1,12 +1,12 @@
 /**
- * Per-avatar fit tuning.
+ * Avatar “fit” presets for normalizing different GLTF models.
  *
- * Keyed by a path fragment so you can match:
- * - folder names
- * - file names
- * - model ids
+ * Different avatars can have wildly different real-world scales and pivots.
+ * `getAvatarFit` provides small per-model overrides so they render consistently
+ * inside the arena without manual per-scene tweaking.
  *
- * Add one entry per real avatar as you import them.
+ * Matching:
+ * - Each config key is matched as a substring against the lowercase avatar URL.
  */
 export type AvatarFitConfig = {
     targetSize?: number;
@@ -28,16 +28,16 @@ export type AvatarFitConfig = {
   
   export const AVATAR_FIT_CONFIG: Record<string, AvatarFitConfig> = {
     oldman: {
-      targetSize: 115,
-      yOffset: 85,
+      targetSize: 120,
+      yOffset: 100,
       rotationY: 0,
-      haloY: 115,
+      haloY: 130,
       haloRadius: 12,
       haloTube: 2.6,
     },
 
     monster: {
-        targetSize: 150,
+        targetSize: 170,
       yOffset: 120,
       rotationY: 0,
       haloY: 115,
@@ -47,7 +47,7 @@ export type AvatarFitConfig = {
 
     breakdance: {
         targetSize: 160,
-      yOffset: 80,
+      yOffset: 95,
       rotationY: 0,
       haloY: 115,
       haloRadius: 12,
@@ -56,7 +56,7 @@ export type AvatarFitConfig = {
 
     timmy: {
         targetSize: 150,
-      yOffset: 70,
+      yOffset: 95,
       rotationY: 0,
       haloY: 115,
       haloRadius: 12,
@@ -64,8 +64,8 @@ export type AvatarFitConfig = {
     },
 
     mouse: {
-        targetSize: 110,
-      yOffset: 70,
+        targetSize: 115,
+      yOffset: 80,
       rotationY: 0,
       haloY: 115,
       haloRadius: 12,
@@ -74,7 +74,7 @@ export type AvatarFitConfig = {
 
     amy: {
         targetSize: 130,
-      yOffset: 70,
+      yOffset: 80,
       rotationY: 0,
       haloY: 115,
       haloRadius: 12,
@@ -82,13 +82,24 @@ export type AvatarFitConfig = {
     },
 
     salsa: {
-        targetSize: 120,
-      yOffset: 70,
+        targetSize: 125,
+      yOffset: 90,
       rotationY: 0,
       haloY: 115,
       haloRadius: 12,
       haloTube: 2.6,
     },
+
+    Flair: {
+      targetSize: 125,
+    yOffset: 90,
+    rotationY: 0,
+    haloY: 115,
+    haloRadius: 12,
+    haloTube: 2.6,
+  },
+
+
 
 
 

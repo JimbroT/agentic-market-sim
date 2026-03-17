@@ -1,7 +1,12 @@
 "use client";
 
+/**
+ * Small collapsible legend/help overlay for the explore arena.
+ *
+ * This is intentionally self-contained state so it can be toggled without
+ * coupling to the main playback controller.
+ */
 import { useState } from "react";
-import { cn } from "../lib/arena-math";
 
 export function ArenaLegend() {
   const [isOpen, setIsOpen] = useState(false);

@@ -1,4 +1,15 @@
-from typing import Any, Dict, List, Optional, Literal
+"""
+Pydantic schemas for validating simulation inputs and outputs.
+
+These models serve two roles:
+- Runtime validation (API requests, LLM outputs) to keep downstream nodes safe.
+- A JSON schema source for constraining the prompt-parsing model output.
+
+The models are intentionally strict (`extra="forbid"`) so unexpected fields are
+caught early and surfaced as validation errors.
+"""
+
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 

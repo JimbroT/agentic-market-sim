@@ -1,11 +1,13 @@
+/**
+ * Background/scene dressing for the explore arena.
+ *
+ * This is purely presentational DOM: gradients, grid dots, and guide lines that
+ * make motion/ranking easier to read in dark mode.
+ */
 type StageBackgroundProps = {
     bottomOffset: number;
   };
-  
-  /**
-   * Dark-mode arena background.
-   * Keeps the stage readable while giving the scene more depth and contrast.
-   */
+
   export function StageBackground({ bottomOffset }: StageBackgroundProps) {
     return (
       <>

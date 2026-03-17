@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Drag behavior for floating panels inside the explore arena.
+ *
+ * The panel position is clamped to stay within the arena viewport and above any
+ * reserved bottom UI (timeline dock). Global mouse listeners are used so drag
+ * continues even if the pointer leaves the panel bounds.
+ */
 import { useEffect, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, RefObject } from "react";
 import type { DragState } from "../types";

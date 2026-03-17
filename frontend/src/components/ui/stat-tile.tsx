@@ -1,3 +1,9 @@
+/**
+ * Small stat display tile (label + value).
+ *
+ * Used in marketing/product preview sections to show simple quantitative
+ * highlights.
+ */
 type StatTileProps = {
     label: string;
     value: string | number;

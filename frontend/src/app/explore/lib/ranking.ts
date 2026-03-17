@@ -1,3 +1,10 @@
+/**
+ * Ranking and interpolation helpers for the explore arena.
+ *
+ * The arena UI plays back a discrete set of round values, but the animation and
+ * scrubbing UI use a continuous `playbackProgress`. These helpers bridge that
+ * gap by interpolating between rounds and re-ranking entities at any moment.
+ */
 import type { PortfolioEntity, RankedEntity } from "../types";
 
 /**

@@ -1,5 +1,17 @@
 "use client";
 
+/**
+ * GLTF-backed avatar renderer for a single entity.
+ *
+ * If `avatarUrl` is provided, loads a GLTF model and normalizes it into a
+ * consistent size/orientation using `getAvatarFit`. Otherwise renders the
+ * procedural `AvatarPlaceholder`.
+ *
+ * Implementation notes:
+ * - We clone the loaded scene so each instance can be transformed/animated
+ *   independently.
+ * - Animation playback is tied to `isPlaying` to avoid wasting work when paused.
+ */
 import { Suspense, useEffect, useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useAnimations, useGLTF } from "@react-three/drei";
@@ -32,6 +44,8 @@ function AvatarModelLoaded({
   const model = useMemo(() => {
     const cloned = clone(gltf.scene) as THREE.Group;
 
+    // Normalize model pivot: center it so scaling/rotation behave consistently
+    // across different source assets.
     const box = new THREE.Box3().setFromObject(cloned);
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
@@ -41,10 +55,12 @@ function AvatarModelLoaded({
 
     cloned.position.sub(center);
 
+    // Normalize model size: scale the largest dimension into a shared target.
     const largestDimension = Math.max(size.x, size.y, size.z) || 1;
     const normalizedScale = fit.targetSize / largestDimension;
     cloned.scale.setScalar(normalizedScale);
 
+    // Optional per-avatar vertical offset to keep feet on the “floor”.
     cloned.position.y += fit.yOffset;
 
     cloned.traverse((child) => {
@@ -82,7 +98,9 @@ function AvatarModelLoaded({
     firstAction.reset();
     firstAction.setLoop(THREE.LoopRepeat, Infinity);
     firstAction.fadeIn(0.2);
-    firstAction.timeScale = 0.5;
+    // Prefer the AnimationAction API over mutating properties directly to keep
+    // hook immutability rules happy.
+    firstAction.setEffectiveTimeScale(0.5);
     firstAction.play();
 
     return () => {

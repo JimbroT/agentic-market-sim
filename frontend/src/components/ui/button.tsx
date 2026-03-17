@@ -1,3 +1,9 @@
+/**
+ * Reusable link-button component.
+ *
+ * This is intentionally implemented with `next/link` (not a `<button>`) so it
+ * can be used for navigation CTAs while retaining consistent styling.
+ */
 import Link from "next/link";
 import { ReactNode } from "react";
 

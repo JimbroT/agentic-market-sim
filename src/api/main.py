@@ -3,6 +3,14 @@ FastAPI entrypoint for the market simulation backend.
 
 This API wraps the LangGraph workflow and returns the full simulation
 result as JSON so a frontend can render charts, tables, and reports.
+
+Primary endpoints:
+- `GET /health`: basic liveness check for local dev.
+- `POST /simulate`: run the workflow and return the full state payload.
+
+Assumptions:
+- The frontend is served locally during development (CORS is permissive for
+  localhost ports).
 """
 
 from fastapi import FastAPI, HTTPException
@@ -10,6 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.graph import graph
+from src.api.insights import build_agent_insights, build_round_series
+
 
 
 app = FastAPI(
@@ -80,9 +90,14 @@ def simulate(input_data: SimulationInput):
 
         result = graph.invoke(initial_state)
 
+        agent_insights = build_agent_insights(result)
+        round_series = build_round_series(result)
+
         return {
             "status": "success",
             "result": result,
+            "agent_insights": agent_insights,
+            "round_series": round_series,
         }
 
     except Exception as e:
@@ -90,3 +105,4 @@ def simulate(input_data: SimulationInput):
             status_code=500,
             detail=f"Simulation failed: {type(e).__name__}: {e}",
         )
+

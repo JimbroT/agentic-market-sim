@@ -1,3 +1,16 @@
+"""
+Prompt-parsing node for the market simulation graph.
+
+This node takes the raw user prompt (`SimState.user_prompt`) and produces a
+validated `SimulationRequest` dict under `SimState.parsed_request`.
+
+Key behavior:
+- Returns structured errors in `SimState.errors` instead of raising for
+  expected failures (empty prompt, validation errors).
+- Uses a JSON schema derived from `SimulationRequest` to constrain the model's
+  output format.
+"""
+
 import json
 
 from ollama import chat

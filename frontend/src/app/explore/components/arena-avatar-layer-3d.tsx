@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Shared Three.js layer for rendering all entity avatars in the arena.
+ *
+ * The DOM podiums and this 3D layer share a single layout function
+ * (`getArenaLayoutAtProgress`) so avatars and podiums stay aligned while
+ * scrubbing and animating.
+ */
 import { Canvas, useThree } from "@react-three/fiber";
 import { memo, useMemo } from "react";
 import type { PortfolioEntity } from "../types";
@@ -9,10 +16,14 @@ import {
 } from "../lib/arena-layout";
 import { ArenaAvatarInstance } from "./arena-avatar-instance";
 
+const AVATAR_OFFSETS: Record<string, { x?: number; y?: number }> = {
+  // Retail Traders: shift slightly left
+  "signal-x": { x: -50 },
+};
+
 type ArenaAvatarLayer3DProps = {
   entities: PortfolioEntity[];
   playbackProgress: number;
-  maxProgress: number;
   bottomOffset: number;
   isPlaying: boolean;
 };
@@ -24,7 +35,6 @@ type ArenaAvatarLayer3DProps = {
 function AvatarScene({
   entities,
   playbackProgress,
-  maxProgress,
   bottomOffset,
   isPlaying,
 }: ArenaAvatarLayer3DProps) {
@@ -44,28 +54,30 @@ function AvatarScene({
       <pointLight position={[180, 120, 160]} intensity={0.55} color="#f59e0b" />
 
       {layout.map((entity) => {
-        const xPx = (entity.xPercent / 100) * size.width - size.width / 2;
-        const yPx =
-          -size.height / 2 +
-          entity.bottomPx +
-          entity.podiumHeight +
-          AVATAR_CENTER_OFFSET_PX;
+      const baseXPx = (entity.xPercent / 100) * size.width - size.width / 2;
+      const baseYPx =
+        -size.height / 2 +
+        entity.bottomPx +
+        entity.podiumHeight +
+        AVATAR_CENTER_OFFSET_PX;
 
-        return (
-          <ArenaAvatarInstance
-            key={entity.id}
-            x={xPx}
-            y={yPx}
-            color={entity.color}
-            accent={entity.accent}
-            avatarUrl={entity.avatarUrl}
-            isLeader={entity.leader}
-            isPlaying={isPlaying}
-            playbackProgress={playbackProgress}
-            maxProgress={maxProgress}
-          />
-        );
-      })}
+      const offsets = AVATAR_OFFSETS[entity.id] ?? {};
+      const xPx = baseXPx + (offsets.x ?? 0);
+      const yPx = baseYPx + (offsets.y ?? 0);
+
+      return (
+        <ArenaAvatarInstance
+          key={entity.id}
+          x={xPx}
+          y={yPx}
+          color={entity.color}
+          accent={entity.accent}
+          avatarUrl={entity.avatarUrl}
+          isLeader={entity.leader}
+          isPlaying={isPlaying}
+        />
+      );
+    })}
     </>
   );
 }

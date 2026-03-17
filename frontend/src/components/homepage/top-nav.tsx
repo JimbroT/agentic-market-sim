@@ -1,3 +1,9 @@
+/**
+ * Homepage top navigation bar.
+ *
+ * This is a marketing/header nav (not the platform shell) and prioritizes a
+ * lightweight look so the hero remains dominant.
+ */
 import Link from "next/link";
 
 const navItems = [

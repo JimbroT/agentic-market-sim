@@ -1,3 +1,11 @@
+/**
+ * Bottom timeline UI for the explore arena.
+ *
+ * Provides a collapsible dock that:
+ * - Shows current playback round/progress
+ * - Allows scrubbing via a range input
+ * - Can be resized (size state is managed by a parent hook)
+ */
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { cn } from "../lib/arena-math";
 

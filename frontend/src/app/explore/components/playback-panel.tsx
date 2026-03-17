@@ -13,6 +13,11 @@ type PlaybackPanelProps = {
   entityCount: number;
   isPlaying: boolean;
   playbackIntervalMs: number;
+  onPrevious: () => void;
+  onNext: () => void;
+  onReset: () => void;
+  onPlay: () => void;
+  onPause: () => void;
 };
 
 export function PlaybackPanel({
@@ -26,11 +31,16 @@ export function PlaybackPanel({
   entityCount,
   isPlaying,
   playbackIntervalMs,
+  onPrevious,
+  onNext,
+  onReset,
+  onPlay,
+  onPause,
 }: PlaybackPanelProps) {
   return (
     <div
       ref={panelRef}
-      className="absolute z-30"
+      className="pointer-events-auto absolute z-50"
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
@@ -39,7 +49,7 @@ export function PlaybackPanel({
       <div
         className={cn(
           "overflow-hidden border border-white/10 bg-[#0f172acc] shadow-[0_24px_54px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-[width,height,border-radius] duration-200",
-          isOpen ? "w-[320px] rounded-[20px]" : "w-[220px] rounded-full"
+          isOpen ? "w-[340px] rounded-[20px]" : "w-[220px] rounded-full"
         )}
       >
         <div
@@ -67,6 +77,40 @@ export function PlaybackPanel({
 
         {isOpen ? (
           <div className="px-4 pb-4">
+            <div className="mb-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onPrevious}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white hover:bg-white/10"
+              >
+                Previous
+              </button>
+
+              <button
+                type="button"
+                onClick={isPlaying ? onPause : onPlay}
+                className="rounded-lg border border-[#60a5fa]/30 bg-[#1d4ed8]/30 px-3 py-2 text-xs text-white hover:bg-[#1d4ed8]/40"
+              >
+                {isPlaying ? "Pause" : "Play"}
+              </button>
+
+              <button
+                type="button"
+                onClick={onNext}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white hover:bg-white/10"
+              >
+                Next
+              </button>
+
+              <button
+                type="button"
+                onClick={onReset}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white hover:bg-white/10"
+              >
+                Reset
+              </button>
+            </div>
+
             <div className="space-y-2 text-sm text-[#cbd5e1]">
               <div className="flex items-center justify-between">
                 <span>Current position</span>

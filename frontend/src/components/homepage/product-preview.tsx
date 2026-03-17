@@ -1,3 +1,9 @@
+/**
+ * Homepage “product preview” block.
+ *
+ * A polished teaser UI that hints at the eventual explore experience; it is not
+ * the live app view itself.
+ */
 import { Button } from "@/components/ui/button";
 import { StatTile } from "@/components/ui/stat-tile";
 import { Surface } from "@/components/ui/surface";

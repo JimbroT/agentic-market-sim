@@ -1,3 +1,9 @@
+/**
+ * Marketing-style homepage route (`/`).
+ *
+ * This page introduces MUMU and links into the interactive `/explore` view.
+ * The content is intentionally static/fast so it can load instantly.
+ */
 import { BackgroundLines } from "@/components/homepage/background-lines";
 import { ProductPreview } from "@/components/homepage/product-preview";
 import { TopNav } from "@/components/homepage/top-nav";

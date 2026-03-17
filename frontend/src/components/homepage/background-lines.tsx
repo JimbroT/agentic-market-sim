@@ -1,6 +1,9 @@
-// Decorative background layer for the homepage.
-// This helps the entire page feel like one continuous composition
-// instead of a stack of disconnected cards.
+/**
+ * Decorative background layer for the homepage hero.
+ *
+ * Purely presentational: adds rings and soft glows so the hero reads as one
+ * cohesive composition rather than disconnected sections.
+ */
 export function BackgroundLines() {
     return (
       <div className="pointer-events-none absolute inset-0 overflow-hidden">

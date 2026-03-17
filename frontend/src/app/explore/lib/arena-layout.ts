@@ -1,3 +1,16 @@
+/**
+ * Shared layout math for the explore arena.
+ *
+ * Given a set of portfolio entities and a continuous playback progress, this
+ * module computes a per-entity layout used by both:
+ * - DOM podium rendering (`PodiumStage`)
+ * - The shared Three.js avatar layer (`ArenaAvatarLayer3D`)
+ *
+ * Key assumptions:
+ * - `playbackProgress` may be fractional; values are interpolated between rounds.
+ * - The returned `xPercent` is lane-based (0–100%), while vertical positioning
+ *   is expressed in pixels to align with viewport/UI offsets.
+ */
 import { getInterpolatedEntityValue, getRankedEntitiesAtProgress } from "./ranking";
 import type { PortfolioEntity } from "../types";
 

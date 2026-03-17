@@ -1,3 +1,10 @@
+/**
+ * Demo dataset for the `/explore` arena.
+ *
+ * Each entity provides per-round values and (optionally) an avatar URL.
+ * Avatars are loaded from `frontend/public/avatars/**` and will fall back to the
+ * procedural placeholder if missing.
+ */
 import type { PortfolioEntity } from "../types";
 
 /**
@@ -10,7 +17,7 @@ import type { PortfolioEntity } from "../types";
 export const demoEntities: PortfolioEntity[] = [
   {
     id: "macro-hf",
-    label: "Macro HF",
+    label: "Macro Hedge Fund",
     color: "#f59e0b",
     accent: "#fbbf24",
     startingBalance: 100,
@@ -19,7 +26,7 @@ export const demoEntities: PortfolioEntity[] = [
   },
   {
     id: "long-only",
-    label: "Long-only",
+    label: "Long-Only Fund",
     color: "#2563eb",
     accent: "#60a5fa",
     startingBalance: 100,
@@ -28,7 +35,7 @@ export const demoEntities: PortfolioEntity[] = [
   },
   {
     id: "vol-fund",
-    label: "Vol Fund",
+    label: "Volatility Fund",
     color: "#7c3aed",
     accent: "#a78bfa",
     startingBalance: 100,
@@ -37,7 +44,7 @@ export const demoEntities: PortfolioEntity[] = [
   },
   {
     id: "alpha-cap",
-    label: "Alpha Cap",
+    label: "Commodities Fund",
     color: "#059669",
     accent: "#34d399",
     startingBalance: 100,
@@ -46,7 +53,7 @@ export const demoEntities: PortfolioEntity[] = [
   },
   {
     id: "delta-sys",
-    label: "Delta Sys",
+    label: "Rates Traders",
     color: "#dc2626",
     accent: "#f87171",
     startingBalance: 100,
@@ -55,7 +62,7 @@ export const demoEntities: PortfolioEntity[] = [
   },
   {
     id: "quant-lab",
-    label: "Quant Lab",
+    label: "Market Makers",
     color: "#0f766e",
     accent: "#2dd4bf",
     startingBalance: 100,
@@ -64,7 +71,7 @@ export const demoEntities: PortfolioEntity[] = [
   },
   {
     id: "signal-x",
-    label: "Signal X",
+    label: "Retail Traders",
     color: "#9333ea",
     accent: "#c084fc",
     startingBalance: 100,
@@ -73,7 +80,7 @@ export const demoEntities: PortfolioEntity[] = [
   },
   {
     id: "deep-value",
-    label: "Deep Value",
+    label: "Central Bank Watchers",
     color: "#ea580c",
     accent: "#fb923c",
     startingBalance: 100,

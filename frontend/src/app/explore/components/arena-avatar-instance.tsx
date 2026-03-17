@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Single avatar instance rendered inside the shared 3D layer.
+ *
+ * Handles smooth position interpolation (lerp) and simple “alive” motion
+ * (bob/sway/lean) to make rank changes feel animated without abrupt jumps.
+ */
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import * as THREE from "three";
@@ -13,8 +19,6 @@ type ArenaAvatarInstanceProps = {
     avatarUrl?: string;
     isLeader: boolean;
     isPlaying: boolean;
-    playbackProgress: number;
-    maxProgress: number;
 };
   
 
@@ -26,8 +30,6 @@ export function ArenaAvatarInstance({
   avatarUrl,
   isLeader,
   isPlaying,
-  playbackProgress,
-  maxProgress,
 }: ArenaAvatarInstanceProps) {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -35,6 +37,8 @@ export function ArenaAvatarInstance({
     if (!groupRef.current) return;
 
     const t = state.clock.elapsedTime;
+    // Subtle “alive” motion. Leaders get slightly stronger movement so the
+    // winner reads clearly even when multiple avatars overlap.
     const bob = Math.sin(t * (isPlaying ? 2.2 : 1.2)) * (isLeader ? 6 : 4);
     const sway = Math.sin(t * 1.1) * (isLeader ? 0.2 : 0.12);
     const lean = Math.sin(t * 1.6) * 0.04;
@@ -42,6 +46,7 @@ export function ArenaAvatarInstance({
     const targetX = x;
     const targetY = y + bob;
 
+    // Smooth follow (lerp) keeps rank changes from snapping.
     groupRef.current.position.x += (targetX - groupRef.current.position.x) * 0.14;
     groupRef.current.position.y += (targetY - groupRef.current.position.y) * 0.14;
     groupRef.current.rotation.y += (sway - groupRef.current.rotation.y) * 0.1;

@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * Resize behavior for the explore timeline dock.
+ *
+ * Tracks width/height with min/max constraints and uses global mouse listeners
+ * so resizing remains consistent during drags.
+ */
 import { useEffect, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ResizeState } from "../types";

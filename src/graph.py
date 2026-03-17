@@ -1,4 +1,17 @@
-from langgraph.graph import StateGraph, START, END
+"""
+LangGraph workflow definition for the market simulation.
+
+This module wires together the node functions in `src/nodes/` into a single
+compiled `graph` object. The API layer (`src/api/main.py`) invokes this graph
+with an initial `SimState` and returns the final state as JSON.
+
+Design notes:
+- The current workflow is a simple linear pipeline to keep the MVP debuggable.
+- Each node should treat the incoming state as immutable input and return only
+  the keys it intends to update.
+"""
+
+from langgraph.graph import END, START, StateGraph
 
 from src.state import SimState
 from src.nodes.parse_prompt import parse_prompt

@@ -1,3 +1,9 @@
+/**
+ * Simple container component for consistent card/panel styling.
+ *
+ * `tone` selects a small set of curated visual treatments used across the
+ * homepage and platform layouts.
+ */
 import { ReactNode } from "react";
 
 type SurfaceProps = {

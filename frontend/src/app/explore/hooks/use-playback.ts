@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * Playback controller for the explore arena.
+ *
+ * Exposes a continuous `playbackProgress` (fractional rounds allowed) and
+ * convenience handlers for play/pause, scrubbing, and round stepping.
+ *
+ * Design note:
+ * - Uses `requestAnimationFrame` so playback stays in sync with render frames.
+ */
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PortfolioEntity } from "../types";
 

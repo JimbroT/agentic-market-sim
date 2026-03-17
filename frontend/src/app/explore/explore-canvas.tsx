@@ -1,24 +1,36 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
-import { demoEntities } from "./data/demo-entities";
 import { usePlayback } from "./hooks/use-playback";
 import { useDraggablePanel } from "./hooks/use-draggable-panel";
 import { useResizableDock } from "./hooks/use-resizable-dock";
-import { getTimelineReservedSpace, cn } from "./lib/arena-math";
+import { getTimelineReservedSpace } from "./lib/arena-math";
 import { PlaybackPanel } from "./components/playback-panel";
 import { PodiumStage } from "./components/podium-stage";
 import { StageBackground } from "./components/stage-background";
 import { TimelineDock } from "./components/timeline-dock";
 import { ArenaAvatarLayer3D } from "./components/arena-avatar-layer-3d";
 import { ArenaLegend } from "./components/arena-legend";
+import { useSimulationData } from "./hooks/use-simulation-data";
 
-export default function ExploreCanvas() {
-  const containerRef = useRef<HTMLElement | null>(null);
-  const playbackPanelRef = useRef<HTMLDivElement | null>(null);
+export function ExploreCanvas() {
+  const { entities, insights: agentInsights, loading, error } =
+    useSimulationData();
 
-  const entities = useMemo(() => demoEntities, []);
+  const [selectedEntityId, setSelectedEntityId] = useState<string>();
+  const [isTimelineOpen, setIsTimelineOpen] = useState(true);
+  const [isPlaybackPanelOpen, setIsPlaybackPanelOpen] = useState(true);
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  const dock = useResizableDock({
+    minHeight: 132,
+    maxHeight: 260,
+  });
+
+  const safeEntities = entities ?? [];
 
   const {
     playbackProgress,
@@ -33,162 +45,153 @@ export default function ExploreCanvas() {
     handlePlay,
     handlePause,
     handleScrub,
-  } = usePlayback({
-    entities,
-  });
+  } = usePlayback({ entities: safeEntities });
 
-  const [isPlaybackOpen, setIsPlaybackOpen] = useState(true);
-  const [isTimelineOpen, setIsTimelineOpen] = useState(true);
-
-  const {
-    size: timelineSize,
-    resizeState,
-    handleResizeStart,
-  } = useResizableDock();
-
-  const timelineReservedSpace = getTimelineReservedSpace(
+  const bottomOffset = getTimelineReservedSpace(
     isTimelineOpen,
-    timelineSize.height
+    dock.size.height
   );
 
-  const {
-    position: playbackPosition,
-    dragState,
-    handleDragStart,
-  } = useDraggablePanel({
+  const draggable = useDraggablePanel({
     containerRef,
-    panelRef: playbackPanelRef,
-    reservedBottomSpace: timelineReservedSpace,
-    defaultPosition: { x: 16, y: 110 },
+    panelRef,
+    reservedBottomSpace: bottomOffset,
+    defaultPosition: { x: 24, y: 96 },
   });
+
+  const isReady = !loading && entities && entities.length > 0;
+
+  if (!isReady) {
+    return (
+      <main className="flex min-h-screen flex-col bg-[#020617] text-[#e2e8f0]">
+        {/* Permanent header */}
+        <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600" />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#64748b]">
+                Portfolio Simulation
+              </p>
+              <h1 className="text-sm font-semibold text-white">
+                MUMU Arena (Live)
+              </h1>
+            </div>
+          </div>
+
+          <Link
+            href="/"
+            className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[#e2e8f0] hover:border-white/20 hover:bg-white/10"
+          >
+            Back to playground
+          </Link>
+        </header>
+
+        <div className="flex flex-1 items-center justify-center px-6">
+          {error ? (
+            <p className="text-sm text-[#f97373]">
+              Failed to run simulation: {error}
+            </p>
+          ) : (
+            <p className="text-sm text-[#94a3b8]">
+              Running portfolio simulation…
+            </p>
+          )}
+        </div>
+      </main>
+    );
+  }
+
+  const dockReservedHeight = isTimelineOpen ? dock.size.height + 32 : 76;
 
   return (
     <main
-      className={cn(
-        "h-screen overflow-hidden bg-[#020617] text-[#f8fafc]",
-        (dragState || resizeState) && "select-none"
-      )}
+      ref={containerRef}
+      className="relative flex min-h-screen flex-col bg-[#020617] text-[#e2e8f0]"
     >
-      <header className="flex h-14 items-center justify-between border-b border-white/10 bg-[#020617]/82 px-4 backdrop-blur-xl">
+      {/* Permanent header */}
+      <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-sky-400 to-blue-600" />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#64748b]">
+              Portfolio Simulation
+            </p>
+            <h1 className="text-sm font-semibold text-white">
+              MUMU Arena (Live)
+            </h1>
+          </div>
+        </div>
+
         <Link
           href="/"
-          className="text-[15px] font-semibold tracking-[0.12em] text-white"
+          className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[#e2e8f0] hover:border-white/20 hover:bg-white/10"
         >
-          MUMU
+          Back to playground
         </Link>
-
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-white">Explore</span>
-          <span className="hidden text-sm text-[#94a3b8] sm:inline">
-            Mascot podium playback
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handlePreviousRound}
-            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#cbd5e1] shadow-sm transition hover:bg-white/10"
-          >
-            Previous
-          </button>
-
-          {!isPlaying ? (
-            <button
-              type="button"
-              onClick={handlePlay}
-              className="rounded-xl bg-[#2563eb] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[#1d4ed8]"
-            >
-              Play
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handlePause}
-              className="rounded-xl bg-[#8b5cf6] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[#7c3aed]"
-            >
-              Pause
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={handleNextRound}
-            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#cbd5e1] shadow-sm transition hover:bg-white/10"
-          >
-            Next
-          </button>
-
-          <button
-            type="button"
-            onClick={handleReset}
-            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#cbd5e1] shadow-sm transition hover:bg-white/10"
-          >
-            Reset
-          </button>
-        </div>
       </header>
 
-      <section
-        ref={containerRef}
-        className="relative h-[calc(100vh-56px)] overflow-hidden"
-      >
-        <StageBackground bottomOffset={timelineReservedSpace} />
+      <section className="relative flex flex-1 flex-col overflow-hidden">
+        <div className="relative flex-1">
+          <StageBackground bottomOffset={bottomOffset} />
 
-        <div className="absolute left-4 top-4 z-20 max-w-[420px]">
-            <p className="text-lg font-medium text-white">
-                Portfolio Mascot Arena
-            </p>
+          <ArenaAvatarLayer3D
+            entities={entities}
+            playbackProgress={playbackProgress}
+            bottomOffset={bottomOffset}
+            isPlaying={isPlaying}
+          />
 
-            <p className="mt-2 text-sm text-[#94a3b8]">
-                Live simulation playback across ranked portfolio entities.
-            </p>
+          <PodiumStage
+            entities={entities}
+            playbackProgress={playbackProgress}
+            bottomOffset={bottomOffset}
+            isPlaying={isPlaying}
+            onSelectEntity={setSelectedEntityId}
+            onClearSelection={() => setSelectedEntityId(undefined)}
+            selectedEntityId={selectedEntityId}
+            displayedRound={displayedRound}
+            agentInsights={agentInsights}
+          />
+
+          <ArenaLegend />
+
+          <PlaybackPanel
+            panelRef={panelRef}
+            position={draggable.position}
+            isOpen={isPlaybackPanelOpen}
+            onToggle={() => setIsPlaybackPanelOpen((v) => !v)}
+            onDragStart={draggable.handleDragStart}
+            displayedRound={displayedRound}
+            totalRounds={totalRounds}
+            entityCount={entities.length}
+            isPlaying={isPlaying}
+            playbackIntervalMs={roundTravelMs}
+            onPrevious={handlePreviousRound}
+            onNext={handleNextRound}
+            onReset={handleReset}
+            onPlay={handlePlay}
+            onPause={handlePause}
+          />
+
+          {/* Timeline dock floats over the bottom, no extra layout height */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40">
+            <div className="pointer-events-auto border-t border-white/10 bg-[#020617f2] backdrop-blur-xl">
+              <TimelineDock
+                playbackProgress={playbackProgress}
+                displayedRound={displayedRound}
+                totalRounds={totalRounds}
+                maxProgress={maxProgress}
+                isPlaying={isPlaying}
+                isOpen={isTimelineOpen}
+                width={dock.size.width}
+                height={dock.size.height}
+                onToggle={() => setIsTimelineOpen((v) => !v)}
+                onChange={handleScrub}
+                onResizeStart={dock.handleResizeStart}
+              />
+            </div>
+          </div>
         </div>
-
-        <ArenaLegend />
-
-
-        <ArenaAvatarLayer3D
-            entities={entities}
-            playbackProgress={playbackProgress}
-            maxProgress={maxProgress}
-            bottomOffset={timelineReservedSpace}
-            isPlaying={isPlaying}
-        />
-
-        <PodiumStage
-            entities={entities}
-            playbackProgress={playbackProgress}
-            bottomOffset={timelineReservedSpace}
-            isPlaying={isPlaying}
-        />
-
-        <PlaybackPanel
-          panelRef={playbackPanelRef}
-          position={playbackPosition}
-          isOpen={isPlaybackOpen}
-          onToggle={() => setIsPlaybackOpen((previous) => !previous)}
-          onDragStart={handleDragStart}
-          displayedRound={displayedRound}
-          totalRounds={totalRounds}
-          entityCount={entities.length}
-          isPlaying={isPlaying}
-          playbackIntervalMs={roundTravelMs}
-        />
-
-        <TimelineDock
-          playbackProgress={playbackProgress}
-          displayedRound={displayedRound}
-          totalRounds={totalRounds}
-          maxProgress={maxProgress}
-          isPlaying={isPlaying}
-          isOpen={isTimelineOpen}
-          width={timelineSize.width}
-          height={timelineSize.height}
-          onToggle={() => setIsTimelineOpen((previous) => !previous)}
-          onChange={handleScrub}
-          onResizeStart={handleResizeStart}
-        />
       </section>
     </main>
   );

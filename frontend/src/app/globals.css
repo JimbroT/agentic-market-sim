@@ -1,3 +1,9 @@
+/*
+ * Global stylesheet for the Next.js frontend.
+ *
+ * Includes Tailwind v4 import plus a few minimal base rules (color scheme,
+ * typography defaults, and link behavior) used across all routes.
+ */
 @import "tailwindcss";
 
 /* Global theme defaults */

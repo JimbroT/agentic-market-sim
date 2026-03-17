@@ -1,3 +1,11 @@
+/**
+ * Shared page layout shell for “platform” style pages.
+ *
+ * Provides:
+ * - Top navigation with placeholder sections
+ * - Consistent title/description framing
+ * - A content slot for page-specific UI
+ */
 import Link from "next/link";
 import { ReactNode } from "react";
 

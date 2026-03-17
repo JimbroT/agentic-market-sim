@@ -10,6 +10,12 @@ from copy import deepcopy
 from typing import Dict, List, Tuple
 
 from src.state import SimState
+from src.schemas import (
+    AgentInsightOut,
+    AgentProfileOut,
+    AllocationBreakdown,
+    MarketMetrics,
+)
 
 
 def _clamp(value: float, lower: float, upper: float) -> float:
@@ -253,6 +259,7 @@ def simulate_round(state: SimState):
     all_reactions: List[Dict] = []
     round_snapshots: List[Dict] = []
     market_history: List[Dict] = []
+    agent_insights: List[AgentInsightOut] = []
 
     for round_number in range(1, round_count + 1):
         world_state["current_round"] = round_number
@@ -264,8 +271,8 @@ def simulate_round(state: SimState):
         shock_summary = _round_shock_summary(world_state, round_number)
 
         updated_participants = []
-        action_log = []
-        participant_metrics = []
+        action_log: List[Dict] = []
+        participant_metrics: List[Dict] = []
 
         for participant in world_state["participants"]:
             participant_copy = deepcopy(participant)
@@ -328,6 +335,52 @@ def simulate_round(state: SimState):
                 }
             )
 
+            # Build AgentProfileOut and AgentInsightOut for this participant/round
+            profile = AgentProfileOut(
+                participant_id=participant_copy["name"],
+                name=participant_copy["name"],
+                conviction=participant_copy.get("conviction", 0.0),
+                risk_budget=participant_copy.get("risk_budget", 0.0),
+                portfolio=AllocationBreakdown(
+                    **_portfolio_mix(participant_copy["portfolio"])
+                ),
+                latest_action=participant_copy.get("latest_action"),
+                style_summary=None,
+            )
+
+            metrics_for_this_round = metric_row
+
+            insight = AgentInsightOut(
+                participant_id=participant_copy["name"],
+                round=round_number,
+                shock_summary=shock_summary,
+                thought=rationale,
+                thesis=rationale,
+                action=action,
+                rationale=rationale,
+                key_signals=[],
+                risks=[],
+                rejected_alternatives=[],
+                expected_next_move=None,
+                confidence=None,
+                market_metrics=MarketMetrics(
+                    **world_state["world_variables"]
+                ),
+                allocation_after=AllocationBreakdown(
+                    **metrics_for_this_round["allocation_after"]
+                ),
+                portfolio_total_before=metrics_for_this_round[
+                    "portfolio_total_before"
+                ],
+                portfolio_total_after=metrics_for_this_round[
+                    "portfolio_total_after"
+                ],
+                pnl_delta=metrics_for_this_round["pnl_delta"],
+                profile=profile,
+            )
+
+            agent_insights.append(insight)
+
         world_state["participants"] = updated_participants
 
         market_history.append(
@@ -355,5 +408,6 @@ def simulate_round(state: SimState):
         "world_state": world_state,
         "round_snapshots": round_snapshots,
         "participant_reactions": all_reactions,
+        "agent_insights": agent_insights,
         "current_step": "simulation_complete",
     }

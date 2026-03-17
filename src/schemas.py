@@ -109,4 +109,47 @@ class FinalReport(StrictModel):
         if isinstance(v, str):
             return v.strip()
         return v
+
+class MarketMetrics(BaseModel):
+    rates: float
+    inflation: float
+    growth: float
+    volatility: float
+    sentiment: float
+
+class AllocationBreakdown(BaseModel):
+    cash: float
+    bonds: float
+    equities: float
+    commodities: float
+    volatility: float
+
+class AgentProfileOut(BaseModel):
+    participant_id: str
+    name: str
+    conviction: float
+    risk_budget: float
+    portfolio: AllocationBreakdown
+    latest_action: Optional[str] = None
+    style_summary: Optional[str] = None
+
+class AgentInsightOut(BaseModel):
+    participant_id: str
+    round: int
+    shock_summary: str
+    thought: str
+    thesis: str
+    action: str
+    rationale: str
+    key_signals: List[str] = Field(default_factory=list)
+    risks: List[str] = Field(default_factory=list)
+    rejected_alternatives: List[str] = Field(default_factory=list)
+    expected_next_move: Optional[str] = None
+    confidence: Optional[float] = None
+    market_metrics: Optional[MarketMetrics] = None
+    allocation_after: Optional[AllocationBreakdown] = None
+    portfolio_total_before: Optional[float] = None
+    portfolio_total_after: Optional[float] = None
+    pnl_delta: Optional[float] = None
+    profile: Optional[AgentProfileOut] = None
  

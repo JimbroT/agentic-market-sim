@@ -3,14 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AgentInsight, PortfolioEntity } from "../types";
 
+type RawRoundSeries = {
+  participant_id: string;
+  backend_name: string;
+  round_values: number[];
+};
+
 type SimulationResponse = {
   status: string;
   agent_insights?: AgentInsight[];
-  round_series?: {
-    participant_id: string;
-    backend_name: string;
-    round_values: number[];
-  }[];
+  round_series?: RawRoundSeries[];
 };
 
 type UseSimulationDataResult = {
@@ -79,6 +81,21 @@ const ENTITY_VISUALS: Record<
   },
 };
 
+const BACKEND_NAME_TO_ENTITY_ID: Record<string, string> = {
+  macrohedgefund: "macro-hf",
+  longonlyfund: "long-only",
+  volatilityfund: "vol-fund",
+  commoditiesfund: "alpha-cap",
+  ratestraders: "delta-sys",
+  marketmakers: "quant-lab",
+  retailtraders: "signal-x",
+  centralbankwatchers: "deep-value",
+};
+
+function normalizeKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 export function useSimulationData(): UseSimulationDataResult {
   const [rawData, setRawData] = useState<SimulationResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -127,7 +144,10 @@ export function useSimulationData(): UseSimulationDataResult {
     if (!rawData?.round_series) return null;
 
     return rawData.round_series.map((series) => {
-      const id = series.participant_id;
+      const id =
+        BACKEND_NAME_TO_ENTITY_ID[normalizeKey(series.backend_name)] ??
+        normalizeKey(series.participant_id);
+
       const visuals = ENTITY_VISUALS[id];
       const startingBalance = 100;
       const roundValues = [startingBalance, ...(series.round_values ?? [])];
@@ -144,10 +164,9 @@ export function useSimulationData(): UseSimulationDataResult {
     });
   }, [rawData]);
 
-  const insights = useMemo(
-    () => rawData?.agent_insights ?? [],
-    [rawData?.agent_insights]
-  );
+  const insights = useMemo<AgentInsight[]>(() => {
+    return rawData?.agent_insights ?? [];
+  }, [rawData]);
 
   return { entities, insights, loading, error };
 }

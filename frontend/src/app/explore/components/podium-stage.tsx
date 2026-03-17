@@ -1,11 +1,10 @@
 "use client";
 
-/**
- * DOM-based podium layer for the explore arena.
- */
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, type Transition } from "framer-motion";
 import { cn } from "../lib/arena-math";
 import { getArenaLayoutAtProgress } from "../lib/arena-layout";
+import { AgentThoughtsCard } from "./agent-thoughts-card";
 import type { PortfolioEntity, AgentInsight } from "../types";
 
 type PodiumStageProps = {
@@ -20,6 +19,21 @@ type PodiumStageProps = {
   agentInsights?: AgentInsight[];
 };
 
+type CardPosition = {
+  x: number;
+  y: number;
+};
+
+type CardSize = {
+  width: number;
+  height: number;
+};
+
+type ContainerSize = {
+  width: number;
+  height: number;
+};
+
 const spring: Transition = {
   type: "spring",
   stiffness: 82,
@@ -32,6 +46,37 @@ const CURRENCY_FORMAT = new Intl.NumberFormat("en-US", {
   currency: "USD",
   maximumFractionDigits: 0,
 });
+
+const CARD_GAP_ABOVE_PODIUM = 120;
+const STAGE_PADDING = 12;
+const FALLBACK_CARD_SIZE: CardSize = {
+  width: 360,
+  height: 560,
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(value, max));
+}
+
+function clampCardPosition(
+  position: CardPosition,
+  cardSize: CardSize,
+  containerSize: ContainerSize
+): CardPosition {
+  const maxX = Math.max(
+    STAGE_PADDING,
+    containerSize.width - cardSize.width - STAGE_PADDING
+  );
+  const maxY = Math.max(
+    STAGE_PADDING,
+    containerSize.height - cardSize.height - STAGE_PADDING
+  );
+
+  return {
+    x: clamp(position.x, STAGE_PADDING, maxX),
+    y: clamp(position.y, STAGE_PADDING, maxY),
+  };
+}
 
 function formatPortfolioBalance(valueIndex: number): string {
   const notional = valueIndex * 1000;
@@ -48,6 +93,7 @@ function formatPnL(
   const negative = notionalDelta < 0;
   const absFormatted = CURRENCY_FORMAT.format(Math.abs(notionalDelta));
   const signPrefix = positive ? "+" : negative ? "-" : "";
+
   return {
     label: `PnL: ${signPrefix}${absFormatted}`,
     positive,
@@ -66,27 +112,95 @@ export function PodiumStage({
   displayedRound,
   agentInsights,
 }: PodiumStageProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerSize, setContainerSize] = useState<ContainerSize>({
+    width: 0,
+    height: 0,
+  });
+  const [cardSize, setCardSize] = useState<CardSize>(FALLBACK_CARD_SIZE);
+  const [persistedCardPosition, setPersistedCardPosition] =
+    useState<CardPosition | null>(null);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+
+    const measure = () => {
+      setContainerSize({
+        width: element.clientWidth,
+        height: element.clientHeight,
+      });
+    };
+
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, []);
+
   const layout = getArenaLayoutAtProgress(
     entities,
     playbackProgress,
     bottomOffset
   );
 
-  const selectedLayout = layout.find(
-    (entity) => entity.id === selectedEntityId
-  );
+  const currentRound = Math.max(1, Math.round(displayedRound ?? 1));
+
+  const selectedLayout = layout.find((entity) => entity.id === selectedEntityId);
 
   const selectedInsight =
-    selectedEntityId && typeof displayedRound === "number"
+    selectedEntityId && currentRound
       ? agentInsights?.find(
           (row) =>
-            row.participant_id === selectedEntityId &&
-            row.round === displayedRound
+            row.participant_id === selectedEntityId && row.round === currentRound
         )
       : undefined;
 
+  const anchoredCardPosition = useMemo<CardPosition | null>(() => {
+    if (!selectedLayout) return null;
+    if (!containerSize.width || !containerSize.height) return null;
+
+    const anchorX = (selectedLayout.xPercent / 100) * containerSize.width;
+    const anchorBottom =
+      selectedLayout.bottomPx + selectedLayout.podiumHeight + CARD_GAP_ABOVE_PODIUM;
+
+    const desired = {
+      x: anchorX - cardSize.width / 2,
+      y: containerSize.height - anchorBottom - cardSize.height,
+    };
+
+    return clampCardPosition(desired, cardSize, containerSize);
+  }, [selectedLayout, containerSize, cardSize]);
+
+  const activeCardPosition = useMemo<CardPosition | null>(() => {
+    if (!containerSize.width || !containerSize.height) return null;
+
+    if (persistedCardPosition) {
+      return clampCardPosition(
+        persistedCardPosition,
+        cardSize,
+        containerSize
+      );
+    }
+
+    return anchoredCardPosition;
+  }, [persistedCardPosition, anchoredCardPosition, cardSize, containerSize]);
+
+  const commitCardPosition = (next: CardPosition) => {
+    if (!containerSize.width || !containerSize.height) {
+      setPersistedCardPosition(next);
+      return;
+    }
+
+    setPersistedCardPosition(
+      clampCardPosition(next, cardSize, containerSize)
+    );
+  };
+
   return (
-    <div className="absolute inset-0 z-20">
+    <div ref={containerRef} className="absolute inset-0 z-20 overflow-hidden">
       {layout.map((entity) => {
         const balanceLabel = formatPortfolioBalance(entity.currentValue);
         const pnl = formatPnL(entity.currentValue, entity.startingBalance);
@@ -206,68 +320,18 @@ export function PodiumStage({
         );
       })}
 
-      {selectedLayout && (
-        <motion.div
-          className="pointer-events-none absolute z-30"
-          style={{
-            left: `${selectedLayout.xPercent}%`,
-            bottom:
-              selectedLayout.bottomPx + selectedLayout.podiumHeight + 120,
-            transform: "translateX(-50%) translateZ(0)",
-          }}
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.96 }}
-          transition={{ duration: 0.16, ease: "easeOut" }}
-        >
-          <div className="pointer-events-auto w-[260px] rounded-2xl border border-white/10 bg-[#020617]/95 px-4 py-3 text-xs text-[#e2e8f0] shadow-[0_18px_40px_rgba(0,0,0,0.6)] backdrop-blur-md">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#64748b]">
-                  Agent thoughts
-                </p>
-                <p className="mt-1 text-xs font-semibold text-white">
-                  {selectedLayout.label}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {typeof displayedRound === "number" && (
-                  <span className="rounded-full bg-white/5 px-2 py-[2px] text-[10px] font-medium text-[#cbd5e1]">
-                    Round {displayedRound.toFixed(0)}
-                  </span>
-                )}
-
-                <button
-                  type="button"
-                  onClick={onClearSelection}
-                  className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-[#cbd5e1] hover:bg-white/10"
-                  aria-label="Close agent thoughts"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-3 space-y-2 text-[11px] leading-relaxed text-[#cbd5e1]">
-              {selectedInsight ? (
-                <>
-                  <p>{selectedInsight.thought}</p>
-                  {selectedInsight.shock_summary && (
-                    <p className="text-[10px] text-[#94a3b8]">
-                      {selectedInsight.shock_summary}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="text-[11px] text-[#64748b]">
-                  Waiting for this agent&apos;s decision for the current round.
-                </p>
-              )}
-            </div>
-          </div>
-        </motion.div>
-      )}
+      {selectedLayout && activeCardPosition ? (
+        <AgentThoughtsCard
+          insight={selectedInsight}
+          label={selectedLayout.label}
+          round={currentRound}
+          onClose={onClearSelection}
+          position={activeCardPosition}
+          dragConstraintsRef={containerRef}
+          onPositionCommit={commitCardPosition}
+          onMeasure={setCardSize}
+        />
+      ) : null}
     </div>
   );
 }

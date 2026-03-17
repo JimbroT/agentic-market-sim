@@ -18,9 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.graph import graph
-from src.api.insights import build_agent_insights, build_round_series
-
-
+from src.api.insights import build_round_series
 
 app = FastAPI(
     title="Agentic Market Simulation API",
@@ -28,7 +26,6 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Allow a local frontend to call this API during development.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -82,6 +79,7 @@ def simulate(input_data: SimulationInput):
             "round_snapshots": [],
             "tool_outputs": {},
             "participant_reactions": [],
+            "agent_insights": [],
             "final_report": {},
             "evals": {},
             "current_step": "start",
@@ -90,13 +88,21 @@ def simulate(input_data: SimulationInput):
 
         result = graph.invoke(initial_state)
 
-        agent_insights = build_agent_insights(result)
         round_series = build_round_series(result)
+
+        agent_insights = result.get("agent_insights", [])
 
         return {
             "status": "success",
             "result": result,
-            "agent_insights": agent_insights,
+            "world_state": result.get("world_state", {}),
+            "round_snapshots": result.get("round_snapshots", []),
+            "participant_reactions": result.get("participant_reactions", []),
+            "final_report": result.get("final_report", {}),
+            "agent_insights": [
+                insight.model_dump() if hasattr(insight, "model_dump") else insight
+                for insight in agent_insights
+            ],
             "round_series": round_series,
         }
 
@@ -105,4 +111,3 @@ def simulate(input_data: SimulationInput):
             status_code=500,
             detail=f"Simulation failed: {type(e).__name__}: {e}",
         )
-

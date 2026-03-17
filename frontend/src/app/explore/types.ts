@@ -19,18 +19,6 @@ export type RankedEntity = PortfolioEntity & {
   rank: number;
 };
 
-export type AgentInsight = {
-  participant_id: string;
-  backend_name: string;
-  round: number;
-  action: string;
-  rationale: string;
-  shock_summary: string;
-  portfolio_total_after: number | null;
-  pnl_delta: number | null;
-  thought: string;
-};
-
 export type DragState = {
   offsetX: number;
   offsetY: number;
@@ -42,3 +30,49 @@ export type ResizeState = {
   startWidth: number;
   startHeight: number;
 } | null;
+
+export type MarketMetrics = {
+  rates: number;
+  inflation: number;
+  growth: number;
+  volatility: number;
+  sentiment: number;
+};
+
+export type AllocationBreakdown = {
+  cash: number;
+  bonds: number;
+  equities: number;
+  commodities: number;
+  volatility: number;
+};
+
+export type AgentProfile = {
+  participantId: string;
+  name: string;
+  description: string;
+  conviction: number;
+  riskBudget: number;
+  latestAction?: string;
+  portfolio: AllocationBreakdown;
+};
+
+export type AgentInsight = {
+  participant_id: string;
+  round: number;
+  thought?: string;
+  shock_summary?: string;
+  action?: string;
+  rationale?: string;
+  portfolio_total_before?: number;
+  portfolio_total_after?: number;
+  pnl_delta?: number;
+  market_metrics?: MarketMetrics;
+  allocation_after?: AllocationBreakdown;
+  profile?: AgentProfile;
+  key_signals?: string[];
+  risks?: string[];
+  rejected_alternatives?: string[];
+  expected_next_move?: string;
+  confidence?: number;
+};

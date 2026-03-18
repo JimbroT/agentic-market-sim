@@ -33,7 +33,7 @@ class OllamaClient:
         base_url: str = "http://localhost:11434",
         timeout_seconds: int = 90,
     ) -> None:
-        self.model = model or "llama3.2:3b"
+        self.model = model or "qwen2.5:1.5b"
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
 

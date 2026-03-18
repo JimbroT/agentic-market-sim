@@ -148,7 +148,7 @@ function ArenaAvatarLayer3DInner(props: ArenaAvatarLayer3DProps) {
         orthographic
         camera={{ position: [0, 0, 500], zoom: 1 }}
         dpr={1}
-        frameloop={props.isPlaying ? "always" : "demand"}
+        frameloop="always"
         gl={{
           alpha: true,
           antialias: false,

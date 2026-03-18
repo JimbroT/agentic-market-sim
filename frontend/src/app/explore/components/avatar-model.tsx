@@ -110,7 +110,6 @@ function AvatarModelLoaded({
   }, [actions, names]);
 
   useFrame((_, delta) => {
-    if (!isPlaying) return;
     mixer.update(delta);
   });
 

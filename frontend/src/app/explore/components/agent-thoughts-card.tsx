@@ -1,3 +1,19 @@
+/**
+ * frontend/src/app/explore/components/agent-thoughts-card.tsx
+ *
+ * Draggable detail card for the selected arena participant.
+ *
+ * This patched version is adapted to the new interactive simulation flow:
+ * - It imports participant/world types from use-simulation.ts.
+ * - It uses the new memory shape: participant.memory.round_summaries.
+ * - It delegates presentation shaping to the updated card view-model mapper.
+ *
+ * Why this file matters:
+ * - It renders the "brain" of the selected agent.
+ * - It turns backend agent output into an explainable UI panel.
+ * - It is one of the main places where the new agentic architecture becomes visible.
+ */
+
 "use client";
 
 import {
@@ -14,9 +30,10 @@ import {
 import { cn } from "../lib/arena-math";
 import { mapAgentInsightToCardViewModel } from "../lib/map-agent-insight-to-card-view-model";
 import type {
+  AgentMemoryEntry,
   Participant,
   WorldState,
-} from "../hooks/use-simulation-data";
+} from "../hooks/use-simulation";
 
 type CardPosition = {
   x: number;
@@ -28,8 +45,6 @@ type CardSize = {
   height: number;
 };
 
-type ParticipantMemoryEntry = Participant["memory"][number];
-
 type LiveMetrics = {
   portfolioBefore: number;
   portfolioAfter: number;
@@ -38,7 +53,7 @@ type LiveMetrics = {
 
 type AgentThoughtsCardProps = {
   participant: Participant;
-  memoryEntry?: ParticipantMemoryEntry;
+  memoryEntry?: AgentMemoryEntry;
   world?: WorldState;
   label: string;
   round: number;
@@ -51,7 +66,7 @@ type AgentThoughtsCardProps = {
 };
 
 function badgeClassName(
-  tone: "neutral" | "positive" | "negative" | "info"
+  tone: "neutral" | "positive" | "negative" | "info",
 ) {
   switch (tone) {
     case "positive":
@@ -80,13 +95,14 @@ export function AgentThoughtsCard({
 }: AgentThoughtsCardProps) {
   const controls = useDragControls();
   const rootRef = useRef<HTMLDivElement | null>(null);
+
   const view = mapAgentInsightToCardViewModel(
     participant,
     memoryEntry,
     world,
     label,
     round,
-    liveMetrics
+    liveMetrics,
   );
 
   useLayoutEffect(() => {
@@ -114,7 +130,7 @@ export function AgentThoughtsCard({
 
   const handleDragEnd = (
     _: MouseEvent | TouchEvent | PointerEvent,
-    info: PanInfo
+    info: PanInfo,
   ) => {
     onPositionCommit({
       x: position.x + info.offset.x,
@@ -161,6 +177,7 @@ export function AgentThoughtsCard({
             <span className="rounded-full bg-white/5 px-2 py-[2px] text-[10px] font-medium text-[#cbd5e1]">
               {view.header.roundLabel}
             </span>
+
             <button
               type="button"
               onClick={onClose}
@@ -179,7 +196,7 @@ export function AgentThoughtsCard({
               key={badge.label}
               className={cn(
                 "rounded-full border px-2 py-1 text-[10px]",
-                badgeClassName(badge.tone)
+                badgeClassName(badge.tone),
               )}
             >
               {badge.label}
@@ -197,12 +214,8 @@ export function AgentThoughtsCard({
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[#cbd5e1]">
             {view.profile.tiles.map((tile) => (
               <div key={tile.label} className="rounded-lg bg-black/20 p-2">
-                <p className="text-[10px] text-[#64748b]">
-                  {tile.label}
-                </p>
-                <p className="mt-1 font-medium text-white">
-                  {tile.value}
-                </p>
+                <p className="text-[10px] text-[#64748b]">{tile.label}</p>
+                <p className="mt-1 font-medium text-white">{tile.value}</p>
               </div>
             ))}
           </div>
@@ -220,12 +233,8 @@ export function AgentThoughtsCard({
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
             {view.scenario.tiles.map((tile) => (
               <div key={tile.label} className="rounded-lg bg-black/20 p-2">
-                <p className="text-[10px] text-[#64748b]">
-                  {tile.label}
-                </p>
-                <p className="mt-1 font-medium text-white">
-                  {tile.value}
-                </p>
+                <p className="text-[10px] text-[#64748b]">{tile.label}</p>
+                <p className="mt-1 font-medium text-white">{tile.value}</p>
               </div>
             ))}
           </div>
@@ -310,9 +319,7 @@ export function AgentThoughtsCard({
           <div className="mt-2 space-y-2 text-xs text-[#cbd5e1]">
             <div className="flex items-center justify-between">
               <span>Action</span>
-              <span className="font-medium text-white">
-                {view.decision.action}
-              </span>
+              <span className="font-medium text-white">{view.decision.action}</span>
             </div>
 
             <div className="flex items-center justify-between">
@@ -322,7 +329,7 @@ export function AgentThoughtsCard({
                   "font-medium",
                   view.decision.pnlTone === "positive" && "text-[#4ade80]",
                   view.decision.pnlTone === "negative" && "text-[#f87171]",
-                  view.decision.pnlTone === "neutral" && "text-white"
+                  view.decision.pnlTone === "neutral" && "text-white",
                 )}
               >
                 {view.decision.pnlLabel}
@@ -364,14 +371,12 @@ export function AgentThoughtsCard({
                     <span>{row.label}</span>
                     <span>{row.displayValue}</span>
                   </div>
+
                   <div className="h-2 overflow-hidden rounded-full bg-white/10">
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-sky-500 to-blue-400"
                       style={{
-                        width: `${Math.max(
-                          0,
-                          Math.min(100, row.value * 100)
-                        )}%`,
+                        width: `${Math.max(0, Math.min(100, row.value * 100))}%`,
                       }}
                     />
                   </div>

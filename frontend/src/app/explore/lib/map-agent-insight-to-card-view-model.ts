@@ -1,9 +1,25 @@
+/**
+ * frontend/src/app/explore/lib/map-agent-insight-to-card-view-model.ts
+ *
+ * Maps the raw participant / memory / world state into a UI-friendly view model
+ * for AgentThoughtsCard.
+ *
+ * This patched version is aligned with the new interactive simulation flow:
+ * - It imports types from use-simulation.ts.
+ * - It reads the new participant fields such as display_name, style, mandate,
+ *   latest_action, latest_thesis, and memory.round_summaries.
+ * - It treats portfolio values as real dollars rather than old index-style units.
+ *
+ * Why this file matters:
+ * - It isolates UI formatting logic from the visual component itself.
+ * - It makes it much easier to evolve the backend schema without rewriting JSX.
+ */
+
 import type {
+  AgentMemoryEntry,
   Participant,
   WorldState,
-} from "../hooks/use-simulation-data";
-
-type ParticipantMemoryEntry = Participant["memory"][number];
+} from "../hooks/use-simulation";
 
 type LiveMetrics = {
   portfolioBefore: number;
@@ -51,6 +67,7 @@ type CardViewModel = {
 
 function formatDollars(value: number | undefined): string {
   if (typeof value !== "number" || Number.isNaN(value)) return "—";
+
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -58,43 +75,74 @@ function formatDollars(value: number | undefined): string {
   }).format(value);
 }
 
+function formatPercent(value: number | undefined, digits = 0): string {
+  if (typeof value !== "number" || Number.isNaN(value)) return "—";
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
+function sentenceCase(value: string | undefined): string {
+  if (!value) return "Unknown";
+  const normalized = value.replace(/_/g, " ");
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function totalPortfolioValue(portfolio: Participant["portfolio"] | undefined): number {
+  if (!portfolio) return 0;
+  return (
+    (portfolio.cash ?? 0) +
+    (portfolio.equities ?? 0) +
+    (portfolio.bonds ?? 0) +
+    (portfolio.commodities ?? 0) +
+    (portfolio.volatility ?? 0)
+  );
+}
+
 export function mapAgentInsightToCardViewModel(
   participant: Participant,
-  memoryEntry: ParticipantMemoryEntry | undefined,
+  memoryEntry: AgentMemoryEntry | undefined,
   world: WorldState | undefined,
   label: string,
   round: number,
-  liveMetrics?: LiveMetrics
+  liveMetrics?: LiveMetrics,
 ): CardViewModel {
+  const participantName = label || participant.display_name;
+  const regime = world?.regime ?? "unknown";
+
   const profile = {
-    style: "Multi-asset",
-    strategy: "Systematic / discretionary blend",
-    regime: world?.regime ?? "unknown",
-    conviction: participant.conviction,
-    risk_budget: participant.risk_budget,
+    style: participant.style || "Multi-asset",
+    strategy: participant.role || participant.mandate || "Market participant",
+    regime,
+    conviction:
+      typeof participant.latest_confidence === "number"
+        ? participant.latest_confidence
+        : undefined,
+    riskBudget: participant.risk_budget,
   };
 
-  const participantName = label || participant.name;
-
   const headerBadges: CardViewModel["header"]["badges"] = [
-    { label: profile.style, tone: "neutral" },
-    { label: `Regime: ${profile.regime}`, tone: "info" },
+    { label: sentenceCase(profile.style), tone: "neutral" },
+    { label: `Regime: ${sentenceCase(profile.regime)}`, tone: "info" },
     {
-      label: `Conviction ${(profile.conviction * 100).toFixed(0)}%`,
-      tone: "positive",
-    },
-    {
-      label: `Risk budget ${(profile.risk_budget * 100).toFixed(0)}%`,
+      label: `Risk budget ${formatPercent(profile.riskBudget, 0)}`,
       tone: "info",
     },
   ];
 
+  if (typeof profile.conviction === "number") {
+    headerBadges.push({
+      label: `Confidence ${formatPercent(profile.conviction, 0)}`,
+      tone: profile.conviction >= 0.65 ? "positive" : "neutral",
+    });
+  }
+
   const worldVars = world?.world_variables;
+
   const scenarioSummary =
-    memoryEntry?.shock_summary ??
-    (world
-      ? `Round ${round}: ${world.event} in a ${world.regime} regime.`
-      : `Round ${round}.`);
+    memoryEntry?.user_event
+      ? `Round ${round}: ${memoryEntry.user_event}`
+      : world?.scenario_prompt
+        ? `Round ${round}: ${world.scenario_prompt}`
+        : `Round ${round}.`;
 
   const action =
     memoryEntry?.action ??
@@ -102,60 +150,56 @@ export function mapAgentInsightToCardViewModel(
     "No action recorded.";
 
   const rationale =
-    memoryEntry?.rationale ??
+    memoryEntry?.market_read ??
+    participant.latest_thesis ??
     "No detailed rationale captured for this round.";
 
-  const isInitialRound = round === 0 || !memoryEntry;
+  const thoughtText =
+    memoryEntry?.market_read ??
+    participant.latest_thesis ??
+    participant.memory.reflection_summary ??
+    "No thought stream available for this round.";
 
-  // base discrete values from memory (index units)
-  const portfolioAfterRawBase = isInitialRound
-    ? 100
-    : memoryEntry?.portfolio_total_after;
-  const pnlDeltaRawBase = isInitialRound ? 0 : memoryEntry?.pnl_delta;
+  const thesis =
+    memoryEntry?.thesis ??
+    participant.latest_thesis ??
+    undefined;
 
-  const INDEX_NOTIONAL = 1000;
-
-  // convert base to dollars
   const portfolioAfterBase =
-    typeof portfolioAfterRawBase === "number"
-      ? portfolioAfterRawBase * INDEX_NOTIONAL
-      : undefined;
+    typeof memoryEntry?.portfolio_value_after === "number"
+      ? memoryEntry.portfolio_value_after
+      : totalPortfolioValue(participant.portfolio);
 
   const pnlDeltaBase =
-    typeof pnlDeltaRawBase === "number"
-      ? pnlDeltaRawBase * INDEX_NOTIONAL
-      : undefined;
+    typeof memoryEntry?.pnl_delta === "number"
+      ? memoryEntry.pnl_delta
+      : 0;
 
   const portfolioBeforeBase =
-    isInitialRound ||
-    typeof portfolioAfterBase !== "number" ||
-    typeof pnlDeltaBase !== "number"
-      ? portfolioAfterBase
+    typeof memoryEntry?.portfolio_value_before === "number"
+      ? memoryEntry.portfolio_value_before
       : portfolioAfterBase - pnlDeltaBase;
 
-  // if liveMetrics is present, prefer it
   const portfolioAfter =
     liveMetrics?.portfolioAfter ?? portfolioAfterBase;
+
   const pnlDelta =
     liveMetrics?.pnlDelta ?? pnlDeltaBase;
+
   const portfolioBefore =
     liveMetrics?.portfolioBefore ?? portfolioBeforeBase;
 
   const pnlTone: "positive" | "negative" | "neutral" =
-    typeof pnlDelta === "number"
-      ? pnlDelta > 0
-        ? "positive"
-        : pnlDelta < 0
-        ? "negative"
-        : "neutral"
-      : "neutral";
+    pnlDelta > 0 ? "positive" : pnlDelta < 0 ? "negative" : "neutral";
 
   const pnlLabel =
     typeof pnlDelta === "number"
       ? `${pnlDelta > 0 ? "+" : pnlDelta < 0 ? "-" : ""}${formatDollars(
-          Math.abs(pnlDelta)
+          Math.abs(pnlDelta),
         )}`
       : "—";
+
+  const executedWeights = memoryEntry?.executed_weights;
 
   const allocationRows: CardViewModel["allocation"]["rows"] = [
     { label: "Cash", key: "cash" as const },
@@ -165,13 +209,13 @@ export function mapAgentInsightToCardViewModel(
     { label: "Volatility", key: "volatility" as const },
   ]
     .map(({ label, key }) => {
-      const val = participant.portfolio[key];
-      if (typeof val !== "number") return null;
-      const pct = val;
+      const value = executedWeights?.[key];
+      if (typeof value !== "number") return null;
+
       return {
         label,
-        value: pct / 100,
-        displayValue: `${pct.toFixed(1)}%`,
+        value,
+        displayValue: `${(value * 100).toFixed(1)}%`,
       };
     })
     .filter(Boolean) as CardViewModel["allocation"]["rows"];
@@ -185,23 +229,28 @@ export function mapAgentInsightToCardViewModel(
     },
     profile: {
       tiles: [
-        { label: "Style", value: profile.style },
-        {
-          label: "Conviction",
-          value: `${(profile.conviction * 100).toFixed(0)}%`,
-        },
+        { label: "Style", value: sentenceCase(profile.style) },
+        { label: "Role", value: participant.role },
         {
           label: "Risk budget",
-          value: `${(profile.risk_budget * 100).toFixed(0)}%`,
+          value: formatPercent(profile.riskBudget, 0),
         },
-        { label: "Regime", value: profile.regime },
+        { label: "Regime", value: sentenceCase(profile.regime) },
       ],
     },
     scenario: {
       summary: scenarioSummary,
       tiles: [
-        { label: "Event", value: world?.event ?? "unknown event" },
-        { label: "Horizon", value: world?.horizon ?? "1d" },
+        {
+          label: "Scenario",
+          value: world?.scenario_summary ?? world?.scenario_prompt ?? "—",
+        },
+        {
+          label: "Current round",
+          value: typeof world?.current_round === "number"
+            ? String(world.current_round)
+            : "—",
+        },
         {
           label: "Rates",
           value:
@@ -213,14 +262,14 @@ export function mapAgentInsightToCardViewModel(
           label: "Inflation",
           value:
             typeof worldVars?.inflation === "number"
-              ? `${worldVars.inflation.toFixed(1)}%`
+              ? `${worldVars.inflation.toFixed(2)}%`
               : "—",
         },
         {
           label: "Growth",
           value:
             typeof worldVars?.growth === "number"
-              ? `${worldVars.growth.toFixed(1)}%`
+              ? `${worldVars.growth.toFixed(2)}%`
               : "—",
         },
         {
@@ -240,15 +289,15 @@ export function mapAgentInsightToCardViewModel(
       ],
     },
     thought: {
-      text: rationale,
-      thesis: undefined,
+      text: thoughtText,
+      thesis,
       signals: [],
       risks: [],
       rejectedAlternatives: [],
-      expectedNextMove: undefined,
+      expectedNextMove: memoryEntry?.lesson ?? undefined,
     },
     decision: {
-      action,
+      action: sentenceCase(action),
       rationale,
       pnlLabel,
       pnlTone,

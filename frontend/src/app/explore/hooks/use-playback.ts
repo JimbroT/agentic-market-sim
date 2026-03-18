@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PortfolioEntity } from "../types";
 
 type UsePlaybackArgs = {
@@ -10,14 +10,13 @@ type UsePlaybackArgs = {
 const ROUND_TRAVEL_MS = 3000;
 
 export function usePlayback({ entities }: UsePlaybackArgs) {
-  // entities[0].roundValues = [start, round1, round2, round3]
-  const totalRounds = useMemo(
+  const timelinePointCount = useMemo(
     () => entities[0]?.roundValues.length ?? 0,
-    [entities]
+    [entities],
   );
 
-  // internal domain 0..(totalRounds - 1) → 0..3
-  const maxProgress = Math.max(totalRounds - 1, 0);
+  const completedRounds = Math.max(timelinePointCount - 1, 0);
+  const maxProgress = completedRounds;
 
   const [playbackProgress, setPlaybackProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -26,15 +25,26 @@ export function usePlayback({ entities }: UsePlaybackArgs) {
   const previousTimestampRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!isPlaying) {
+    setPlaybackProgress((previous) => Math.min(previous, maxProgress));
+  }, [maxProgress]);
+
+  useEffect(() => {
+    if (!isPlaying || maxProgress <= 0) {
       previousTimestampRef.current = null;
-      if (animationFrameRef.current) {
+
+      if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
+
       return;
     }
 
+    let cancelled = false;
+
     function tick(timestamp: number) {
+      if (cancelled) return;
+
       if (previousTimestampRef.current == null) {
         previousTimestampRef.current = timestamp;
       }
@@ -46,6 +56,7 @@ export function usePlayback({ entities }: UsePlaybackArgs) {
         const next = previous + deltaMs / ROUND_TRAVEL_MS;
 
         if (next >= maxProgress) {
+          cancelled = true;
           setIsPlaying(false);
           return maxProgress;
         }
@@ -53,71 +64,84 @@ export function usePlayback({ entities }: UsePlaybackArgs) {
         return next;
       });
 
-      animationFrameRef.current = requestAnimationFrame(tick);
+      if (!cancelled) {
+        animationFrameRef.current = requestAnimationFrame(tick);
+      }
     }
 
     animationFrameRef.current = requestAnimationFrame(tick);
 
     return () => {
-      if (animationFrameRef.current) {
+      cancelled = true;
+      previousTimestampRef.current = null;
+
+      if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
     };
   }, [isPlaying, maxProgress]);
 
-  function handleNextRound() {
+  const handleNextRound = useCallback(() => {
     setIsPlaying(false);
+    previousTimestampRef.current = null;
     setPlaybackProgress((previous) =>
-      Math.min(Math.floor(previous + 1), maxProgress)
+      Math.min(Math.floor(previous) + 1, maxProgress),
     );
-  }
+  }, [maxProgress]);
 
-  function handlePreviousRound() {
+  const handlePreviousRound = useCallback(() => {
     setIsPlaying(false);
+    previousTimestampRef.current = null;
     setPlaybackProgress((previous) =>
-      Math.max(Math.ceil(previous - 1), 0)
+      Math.max(Math.ceil(previous) - 1, 0),
     );
-  }
+  }, []);
 
-  function handleReset() {
+  const handleReset = useCallback(() => {
     setIsPlaying(false);
+    previousTimestampRef.current = null;
     setPlaybackProgress(0);
-  }
+  }, []);
 
-  function handlePlay() {
-    if (playbackProgress >= maxProgress) {
-      setPlaybackProgress(0);
+  const handlePlay = useCallback(() => {
+    previousTimestampRef.current = null;
+
+    setPlaybackProgress((previous) => {
+      if (previous >= maxProgress) {
+        return Math.max(maxProgress - 1, 0);
+      }
+      return previous;
+    });
+
+    if (maxProgress > 0) {
+      setIsPlaying(true);
     }
+  }, [maxProgress]);
 
-    setIsPlaying(true);
-  }
-
-  function handlePause() {
+  const handlePause = useCallback(() => {
     setIsPlaying(false);
-  }
+    previousTimestampRef.current = null;
+  }, []);
 
-  function handleScrub(nextProgress: number) {
-    setIsPlaying(false);
-    setPlaybackProgress(
-      Math.min(Math.max(nextProgress, 0), maxProgress)
-    );
-  }
+  const handleScrub = useCallback(
+    (nextProgress: number) => {
+      setIsPlaying(false);
+      previousTimestampRef.current = null;
+      setPlaybackProgress(Math.min(Math.max(nextProgress, 0), maxProgress));
+    },
+    [maxProgress],
+  );
 
-  const continuousRound = playbackProgress;      // 0..3
-  const currentRound = Math.floor(continuousRound);
-  const displayedRound = continuousRound;
-
-  // UI: 1..4 label space (so you can show "Round 1.00 of 4")
-  const uiRound = displayedRound + 1;            // 1..4
-  const uiRoundTotal = maxProgress + 1;          // 4
+  const currentRound = Math.floor(playbackProgress);
+  const displayedRound = playbackProgress;
 
   return {
     playbackProgress,
     currentRound,
     displayedRound,
-    uiRound,
-    uiRoundTotal,
-    totalRounds,
+    timelinePointCount,
+    completedRounds,
     maxProgress,
     isPlaying,
     roundTravelMs: ROUND_TRAVEL_MS,

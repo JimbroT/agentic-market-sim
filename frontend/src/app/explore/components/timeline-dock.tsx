@@ -1,18 +1,10 @@
-/**
- * Bottom timeline UI for the explore arena.
- *
- * Provides a collapsible dock that:
- * - Shows current playback round/progress
- * - Allows scrubbing via a range input
- * - Can be resized (size state is managed by a parent hook)
- */
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { cn } from "../lib/arena-math";
 
 type TimelineDockProps = {
   playbackProgress: number;
   displayedRound: number;
-  totalRounds: number;
+  completedRounds: number;
   maxProgress: number;
   isPlaying: boolean;
   isOpen: boolean;
@@ -26,7 +18,7 @@ type TimelineDockProps = {
 export function TimelineDock({
   playbackProgress,
   displayedRound,
-  totalRounds,
+  completedRounds,
   maxProgress,
   isPlaying,
   isOpen,
@@ -47,7 +39,7 @@ export function TimelineDock({
       <div
         className={cn(
           "relative overflow-hidden border border-white/10 bg-[#0f172acc] shadow-[0_22px_48px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-[height,width,border-radius] duration-200",
-          isOpen ? "rounded-[22px]" : "rounded-full"
+          isOpen ? "rounded-[22px]" : "rounded-full",
         )}
         style={{ height: isOpen ? `${height}px` : "56px" }}
       >
@@ -57,8 +49,8 @@ export function TimelineDock({
               Timeline
             </p>
             <p className="mt-1 truncate text-xs text-[#94a3b8]">
-              {isPlaying ? "Live playback" : "Manual scrub"} · Round{" "}
-              {displayedRound.toFixed(2)} of {totalRounds}
+              {isPlaying ? "Live playback" : "Manual scrub"} · Position{" "}
+              {displayedRound.toFixed(2)} of {completedRounds}
             </p>
           </div>
 
@@ -84,16 +76,16 @@ export function TimelineDock({
             />
 
             <div className="mt-3 flex justify-between text-[11px] text-[#64748b]">
-              {Array.from({ length: totalRounds }, (_, index) => (
+              {Array.from({ length: completedRounds + 1 }, (_, index) => (
                 <span
                   key={index}
                   className={cn(
                     "transition-colors",
                     Math.abs(playbackProgress - index) < 0.5 &&
-                      "font-semibold text-[#60a5fa]"
+                      "font-semibold text-[#60a5fa]",
                   )}
                 >
-                  {index + 1}
+                  {index === 0 ? "Start" : index}
                 </span>
               ))}
             </div>

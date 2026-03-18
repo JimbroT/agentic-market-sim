@@ -6,21 +6,22 @@ import { cn } from "../lib/arena-math";
 import { getArenaLayoutAtProgress } from "../lib/arena-layout";
 import { AgentThoughtsCard } from "./agent-thoughts-card";
 import type { PortfolioEntity } from "../types";
-import { toEntityId } from "../hooks/use-simulation-data";
 import type {
+  AgentMemoryEntry,
   Participant,
   WorldState,
-} from "../hooks/use-simulation-data";
+} from "../hooks/use-simulation";
+import { toEntityId } from "../hooks/use-simulation";
 
 type PodiumStageProps = {
   entities: PortfolioEntity[];
-  playbackProgress: number; // continuous 0..maxProgress
+  playbackProgress: number;
   bottomOffset: number;
   isPlaying: boolean;
   onSelectEntity?: (id: string) => void;
   onClearSelection?: () => void;
   selectedEntityId?: string;
-  displayedRound?: number; // should be same as playbackProgress
+  displayedRound?: number;
   participants?: Participant[];
   world: WorldState | null;
 };
@@ -61,6 +62,7 @@ const CURRENCY_FORMAT = new Intl.NumberFormat("en-US", {
 
 const CARD_GAP_ABOVE_PODIUM = 120;
 const STAGE_PADDING = 12;
+
 const FALLBACK_CARD_SIZE: CardSize = {
   width: 360,
   height: 560,
@@ -73,15 +75,15 @@ function clamp(value: number, min: number, max: number) {
 function clampCardPosition(
   position: CardPosition,
   cardSize: CardSize,
-  containerSize: ContainerSize
+  containerSize: ContainerSize,
 ): CardPosition {
   const maxX = Math.max(
     STAGE_PADDING,
-    containerSize.width - cardSize.width - STAGE_PADDING
+    containerSize.width - cardSize.width - STAGE_PADDING,
   );
   const maxY = Math.max(
     STAGE_PADDING,
-    containerSize.height - cardSize.height - STAGE_PADDING
+    containerSize.height - cardSize.height - STAGE_PADDING,
   );
 
   return {
@@ -90,26 +92,111 @@ function clampCardPosition(
   };
 }
 
-function formatPortfolioBalance(valueIndex: number): string {
-  const notional = valueIndex * 1000;
-  return CURRENCY_FORMAT.format(notional);
+function formatPortfolioBalance(value: number): string {
+  return CURRENCY_FORMAT.format(value);
 }
 
 function formatPnL(
-  currentIndex: number,
-  baseIndex = 100
+  pnlDelta: number,
 ): { label: string; positive: boolean; negative: boolean } {
-  const deltaIndex = currentIndex - baseIndex;
-  const notionalDelta = deltaIndex * 1000;
-  const positive = notionalDelta > 0;
-  const negative = notionalDelta < 0;
-  const absFormatted = CURRENCY_FORMAT.format(Math.abs(notionalDelta));
+  const positive = pnlDelta > 0;
+  const negative = pnlDelta < 0;
+  const absFormatted = CURRENCY_FORMAT.format(Math.abs(pnlDelta));
   const signPrefix = positive ? "+" : negative ? "-" : "";
 
   return {
     label: `PnL: ${signPrefix}${absFormatted}`,
     positive,
     negative,
+  };
+}
+
+function totalPortfolioValue(portfolio: Participant["portfolio"] | undefined): number {
+  if (!portfolio) return 0;
+
+  return (
+    (portfolio.cash ?? 0) +
+    (portfolio.equities ?? 0) +
+    (portfolio.bonds ?? 0) +
+    (portfolio.commodities ?? 0) +
+    (portfolio.volatility ?? 0)
+  );
+}
+
+function getSortedRounds(participant?: Participant): AgentMemoryEntry[] {
+  return (
+    participant?.memory?.round_summaries
+      ?.filter((entry) => typeof entry.round_number === "number")
+      ?.sort((a, b) => a.round_number - b.round_number) ?? []
+  );
+}
+
+function interpolateParticipantMetrics(
+  participant: Participant | undefined,
+  playbackProgress: number,
+): LiveMetrics | undefined {
+  if (!participant) return undefined;
+
+  const rounds = getSortedRounds(participant);
+  if (!rounds.length) return undefined;
+
+  const t = playbackProgress;
+
+  if (t <= 0) {
+    const firstBefore =
+      rounds[0]?.portfolio_value_before ??
+      totalPortfolioValue(participant.portfolio);
+
+    return {
+      portfolioBefore: firstBefore,
+      portfolioAfter: firstBefore,
+      pnlDelta: 0,
+    };
+  }
+
+  let lower = rounds[0];
+  let upper = rounds[rounds.length - 1];
+
+  for (let i = 0; i < rounds.length - 1; i += 1) {
+    const a = rounds[i];
+    const b = rounds[i + 1];
+
+    if (a.round_number <= t && t <= b.round_number) {
+      lower = a;
+      upper = b;
+      break;
+    }
+  }
+
+  if (t <= rounds[0].round_number) {
+    lower = rounds[0];
+    upper = rounds[0];
+  } else if (t >= rounds[rounds.length - 1].round_number) {
+    lower = rounds[rounds.length - 1];
+    upper = rounds[rounds.length - 1];
+  }
+
+  const t0 = lower.round_number;
+  const t1 = upper.round_number;
+  const alpha = t1 === t0 ? 0 : (t - t0) / (t1 - t0);
+  const lerp = (a: number, b: number, x: number) => a + (b - a) * x;
+
+  return {
+    portfolioBefore: lerp(
+      lower.portfolio_value_before ?? 0,
+      upper.portfolio_value_before ?? lower.portfolio_value_before ?? 0,
+      alpha,
+    ),
+    portfolioAfter: lerp(
+      lower.portfolio_value_after ?? 0,
+      upper.portfolio_value_after ?? lower.portfolio_value_after ?? 0,
+      alpha,
+    ),
+    pnlDelta: lerp(
+      lower.pnl_delta ?? 0,
+      upper.pnl_delta ?? lower.pnl_delta ?? 0,
+      alpha,
+    ),
   };
 }
 
@@ -126,11 +213,14 @@ export function PodiumStage({
   world,
 }: PodiumStageProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+
   const [containerSize, setContainerSize] = useState<ContainerSize>({
     width: 0,
     height: 0,
   });
+
   const [cardSize, setCardSize] = useState<CardSize>(FALLBACK_CARD_SIZE);
+
   const [persistedCardPosition, setPersistedCardPosition] =
     useState<CardPosition | null>(null);
 
@@ -156,90 +246,33 @@ export function PodiumStage({
   const layout = getArenaLayoutAtProgress(
     entities,
     playbackProgress,
-    bottomOffset
+    bottomOffset,
   );
 
-  // integer round label for the card (0-based)
   const currentRound = Math.max(
     0,
-    Math.floor(displayedRound ?? playbackProgress ?? 0)
+    Math.floor(displayedRound ?? playbackProgress ?? 0),
   );
 
-  const selectedLayout = layout.find((e) => e.id === selectedEntityId);
+  const selectedLayout = layout.find((entity) => entity.id === selectedEntityId);
 
-  const selectedParticipant = participants?.find((p) => {
+  const selectedParticipant = participants?.find((participant) => {
     if (!selectedEntityId) return false;
-    const id = toEntityId(p.name);
-    return id === selectedEntityId;
+    return toEntityId(participant.agent_id) === selectedEntityId;
   });
+
+  const selectedMemoryRounds = getSortedRounds(selectedParticipant);
 
   const selectedMemoryEntry =
     currentRound === 0
       ? undefined
-      : selectedParticipant?.memory.find((m) => m.round === currentRound) ??
-        selectedParticipant?.memory.find((m) => typeof m.round === "number");
+      : selectedMemoryRounds.find((entry) => entry.round_number === currentRound) ??
+        selectedMemoryRounds[selectedMemoryRounds.length - 1];
 
-  // Live interpolated metrics so the card updates continuously
-  let liveMetrics: LiveMetrics | undefined = undefined;
-
-  // inside PodiumStage, replacing your liveMetrics block
-  if (selectedParticipant) {
-    const rounds = selectedParticipant.memory
-      .filter((m) => typeof m.round === "number")
-      .sort((a, b) => (a.round! - b.round!)); // [1,2,3]
-
-    if (rounds.length > 0) {
-      // playbackProgress is 1..3
-      const t = playbackProgress;
-
-      // find the segment that contains t
-      let lower = rounds[0];
-      let upper = rounds[rounds.length - 1];
-
-      for (let i = 0; i < rounds.length - 1; i++) {
-        const a = rounds[i];
-        const b = rounds[i + 1];
-        if ((a.round ?? 0) <= t && t <= (b.round ?? 0)) {
-          lower = a;
-          upper = b;
-          break;
-        }
-      }
-
-      // if t is before first or after last, clamp
-      if (t <= (rounds[0].round ?? 1)) {
-        lower = rounds[0];
-        upper = rounds[0];
-      } else if (t >= (rounds[rounds.length - 1].round ?? t)) {
-        lower = rounds[rounds.length - 1];
-        upper = rounds[rounds.length - 1];
-      }
-
-      const t0 = lower.round ?? 1;
-      const t1 = upper.round ?? t0;
-      const alpha = t1 === t0 ? 0 : (t - t0) / (t1 - t0);
-
-      const lerp = (a: number, b: number, aT: number) => a + (b - a) * aT;
-
-      const after0 = lower.portfolio_total_after ?? 100;
-      const after1 = upper.portfolio_total_after ?? after0;
-      const pnl0 = lower.pnl_delta ?? 0;
-      const pnl1 = upper.pnl_delta ?? pnl0;
-
-      const portfolioAfterRaw = lerp(after0, after1, alpha);
-      const pnlDeltaRaw = lerp(pnl0, pnl1, alpha);
-      const portfolioBeforeRaw = portfolioAfterRaw - pnlDeltaRaw;
-
-      const INDEX_NOTIONAL = 1000;
-
-      liveMetrics = {
-        portfolioAfter: portfolioAfterRaw * INDEX_NOTIONAL,
-        portfolioBefore: portfolioBeforeRaw * INDEX_NOTIONAL,
-        pnlDelta: pnlDeltaRaw * INDEX_NOTIONAL,
-      };
-    }
-  }
-
+  const liveMetrics = interpolateParticipantMetrics(
+    selectedParticipant,
+    playbackProgress,
+  );
 
   const anchoredCardPosition = useMemo<CardPosition | null>(() => {
     if (!selectedLayout) return null;
@@ -266,7 +299,7 @@ export function PodiumStage({
       return clampCardPosition(
         persistedCardPosition,
         cardSize,
-        containerSize
+        containerSize,
       );
     }
 
@@ -280,15 +313,30 @@ export function PodiumStage({
     }
 
     setPersistedCardPosition(
-      clampCardPosition(next, cardSize, containerSize)
+      clampCardPosition(next, cardSize, containerSize),
     );
   };
 
   return (
     <div ref={containerRef} className="absolute inset-0 z-20 overflow-hidden">
       {layout.map((entity) => {
-        const balanceLabel = formatPortfolioBalance(entity.currentValue);
-        const pnl = formatPnL(entity.currentValue, entity.startingBalance);
+        const participant = participants?.find(
+          (item) => toEntityId(item.agent_id) === entity.id,
+        );
+
+        const metrics = interpolateParticipantMetrics(
+          participant,
+          playbackProgress,
+        );
+
+        const livePortfolioValue =
+          metrics?.portfolioAfter ??
+          totalPortfolioValue(participant?.portfolio);
+
+        const livePnlDelta = metrics?.pnlDelta ?? 0;
+
+        const balanceLabel = formatPortfolioBalance(livePortfolioValue);
+        const pnl = formatPnL(livePnlDelta);
 
         return (
           <motion.div
@@ -345,7 +393,7 @@ export function PodiumStage({
                     entity.leader &&
                       "border-[#60a5fa]/30 shadow-[0_0_30px_rgba(59,130,246,0.12),0_12px_32px_rgba(0,0,0,0.38)]",
                     selectedEntityId === entity.id &&
-                      "border-[#38bdf8]/60 shadow-[0_0_32px_rgba(56,189,248,0.22),0_12px_32px_rgba(0,0,0,0.5)]"
+                      "border-[#38bdf8]/60 shadow-[0_0_32px_rgba(56,189,248,0.22),0_12px_32px_rgba(0,0,0,0.5)]",
                   )}
                   animate={{
                     y: entity.leader ? -2 : 0,
@@ -360,6 +408,7 @@ export function PodiumStage({
                   <p className="mt-1 text-[11px] text-[#94a3b8]">
                     Portfolio Balance:
                   </p>
+
                   <p className="text-xs font-semibold text-[#e2e8f0]">
                     {balanceLabel}
                   </p>
@@ -371,7 +420,7 @@ export function PodiumStage({
                       pnl.negative && "text-[#f87171]",
                       !pnl.positive &&
                         !pnl.negative &&
-                        "text-[#94a3b8]"
+                        "text-[#94a3b8]",
                     )}
                   >
                     {pnl.label}
@@ -383,7 +432,7 @@ export function PodiumStage({
                 className={cn(
                   "relative w-[112px] rounded-t-[18px] border border-white/10 shadow-[0_18px_34px_rgba(0,0,0,0.38)]",
                   entity.leader &&
-                    "shadow-[0_0_28px_rgba(96,165,250,0.12),0_18px_34px_rgba(0,0,0,0.38)]"
+                    "shadow-[0_0_28px_rgba(96,165,250,0.12),0_18px_34px_rgba(0,0,0,0.38)]",
                 )}
                 animate={{
                   height: entity.podiumHeight,

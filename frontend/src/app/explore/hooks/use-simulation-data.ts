@@ -1,55 +1,42 @@
+/**
+ * frontend/src/app/explore/hooks/use-simulation-data.ts
+ *
+ * Legacy compatibility shim for older explore components.
+ *
+ * This file previously:
+ * - auto-fetched a hardcoded simulation on mount,
+ * - expected the old backend response shape,
+ * - exported Participant / WorldState types tied to the legacy data model.
+ *
+ * That behavior no longer matches the new interactive simulation architecture.
+ *
+ * New role of this file:
+ * - Re-export the new shared helper `toEntityId`,
+ * - Provide a deprecated hook that returns an empty state and a clear warning,
+ * - Avoid accidental use of the old one-shot simulation flow.
+ *
+ * Why keep this file at all?
+ * - Some existing components may still import from this path.
+ * - Keeping a compatibility shim is safer than leaving the old hardcoded logic
+ *   around while the frontend is being migrated.
+ *
+ * Recommended long-term plan:
+ * - Update all remaining imports to use `useSimulation` from `./use-simulation`
+ * - Then delete this file entirely.
+ */
+
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 import type { PortfolioEntity } from "../types";
+import type {
+  Participant,
+  WorldState,
+} from "./use-simulation";
+import { toEntityId } from "./use-simulation";
 
-type ParticipantMemoryEntry = {
-  type?: string;
-  round?: number;
-  shock_summary?: string;
-  action?: string;
-  rationale?: string;
-  portfolio_total_after?: number;
-  pnl_delta?: number;
-};
-
-export type Participant = {
-  name: string;
-  portfolio: {
-    cash: number;
-    bonds: number;
-    equities: number;
-    commodities: number;
-    volatility: number;
-  };
-  conviction: number;
-  risk_budget: number;
-  memory: ParticipantMemoryEntry[];
-  latest_action: string;
-};
-
-export type WorldState = {
-  event: string;
-  regime: string;
-  horizon: string;
-  timeline_mode: string;
-  current_round: number;
-  world_variables: {
-    rates: number;
-    inflation: number;
-    growth: number;
-    volatility: number;
-    sentiment: number;
-  };
-  participants: Participant[];
-};
-
-type SimulationResponse = {
-  status: string;
-  result: {
-    world_state: WorldState;
-  };
-};
+export type { Participant, WorldState };
+export { toEntityId };
 
 type UseSimulationDataResult = {
   entities: PortfolioEntity[] | null;
@@ -59,175 +46,29 @@ type UseSimulationDataResult = {
   error: string | null;
 };
 
-const ENTITY_VISUALS: Record<
-  string,
-  {
-    label: string;
-    color: string;
-    accent: string;
-    avatarUrl?: string;
-  }
-> = {
-  "macro-hf": {
-    label: "Macro Hedge Fund",
-    color: "#2563eb",
-    accent: "#60a5fa",
-    avatarUrl: "/avatars/oldman/oldman.gltf",
-  },
-  "long-only": {
-    label: "Long-Only Fund",
-    color: "#0f766e",
-    accent: "#2dd4bf",
-    avatarUrl: "/avatars/amy/amy.gltf",
-  },
-  "vol-fund": {
-    label: "Volatility Fund",
-    color: "#7c3aed",
-    accent: "#a78bfa",
-    avatarUrl: "/avatars/monster/monster.gltf",
-  },
-  "alpha-cap": {
-    label: "Commodities Fund",
-    color: "#b45309",
-    accent: "#f59e0b",
-    avatarUrl: "/avatars/salsa/salsa.gltf",
-  },
-  "delta-sys": {
-    label: "Rates Traders",
-    color: "#475569",
-    accent: "#94a3b8",
-    avatarUrl: "/avatars/mouse/mouse.gltf",
-  },
-  "quant-lab": {
-    label: "Market Makers",
-    color: "#be123c",
-    accent: "#fb7185",
-    avatarUrl: "/avatars/breakdance/breakdance.gltf",
-  },
-  "signal-x": {
-    label: "Retail Traders",
-    color: "#16a34a",
-    accent: "#4ade80",
-    avatarUrl: "/avatars/timmy/timmy.gltf",
-  },
-  "deep-value": {
-    label: "Central Bank Watchers",
-    color: "#1d4ed8",
-    accent: "#38bdf8",
-    avatarUrl: "/avatars/Flair/Flair.gltf",
-  },
-};
-
-const BACKEND_NAME_TO_ENTITY_ID: Record<string, string> = {
-  macro_hedge_fund: "macro-hf",
-  long_only_fund: "long-only",
-  volatility_fund: "vol-fund",
-  commodities_fund: "alpha-cap",
-  rates_traders: "delta-sys",
-  market_makers: "quant-lab",
-  retail_traders: "signal-x",
-  central_bank_watchers: "deep-value",
-};
-
-function normalizeKey(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9_]/g, "");
-}
-
-export function toEntityId(raw?: string) {
-  const normalized = normalizeKey(raw ?? "");
-  return BACKEND_NAME_TO_ENTITY_ID[normalized] ?? normalized;
-}
-
+/**
+ * Deprecated compatibility hook.
+ *
+ * Important:
+ * - This hook no longer fetches data.
+ * - The new explore flow should use `useSimulation()` at the page level.
+ * - Returning an inert state is safer than silently running the legacy API path.
+ */
 export function useSimulationData(): UseSimulationDataResult {
-  const [rawData, setRawData] = useState<SimulationResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const response = await fetch("http://localhost:8000/simulate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt:
-              "Raise interest rates by 10 and keep geopolitics peaceful over the next day.",
-          }),
-        });
-
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(text || "Simulation request failed");
-        }
-
-        const data = (await response.json()) as SimulationResponse;
-        if (!cancelled) {
-          setRawData(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Unknown error");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        "[useSimulationData] Deprecated: use `useSimulation()` from './use-simulation' instead.",
+      );
     }
-
-    load();
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
-  const world = useMemo<WorldState | null>(() => {
-    return rawData?.result?.world_state ?? null;
-  }, [rawData]);
-
-  const participants = useMemo<Participant[]>(() => {
-    return world?.participants ?? [];
-  }, [world]);
-
-  const entities = useMemo<PortfolioEntity[] | null>(() => {
-    if (!world) return null;
-
-    return world.participants.map((p) => {
-      const id = toEntityId(p.name);
-      const visuals = ENTITY_VISUALS[id];
-      const startingBalance = 100;
-
-      const memoryRounds = p.memory.filter(
-        (m) => typeof m.round === "number"
-      );
-      const sortedRounds = memoryRounds.sort(
-        (a, b) => (a.round ?? 0) - (b.round ?? 0)
-      );
-
-      const roundValues = [
-        startingBalance,
-        ...sortedRounds.map(
-          (m) => m.portfolio_total_after ?? startingBalance
-        ),
-      ];
-
-      return {
-        id,
-        label: visuals?.label ?? p.name,
-        color: visuals?.color ?? "#2563eb",
-        accent: visuals?.accent ?? "#60a5fa",
-        avatarUrl: visuals?.avatarUrl,
-        startingBalance,
-        roundValues,
-      };
-    });
-  }, [world]);
-
-  return { entities, participants, world, loading, error };
+  return {
+    entities: null,
+    participants: [],
+    world: null,
+    loading: false,
+    error:
+      "useSimulationData is deprecated. Migrate this component to use the page-level useSimulation hook.",
+  };
 }
